@@ -1,7 +1,7 @@
 # Apex Best Practices — Current Patterns
 
-> AI: Use these patterns when generating Apex code. These are the current recommended approaches for Summer '25.
-> Release: Summer '25 | API: v64.0 | Updated: 2025-06
+> AI: Use these patterns when generating Apex code. These are the current recommended approaches for Summer '26.
+> Release: Summer '26 | API: v67.0 | Updated: 2026-06
 
 ---
 
@@ -49,6 +49,8 @@ public with sharing class OpportunityTriggerHandler {
     private static void syncExternalSystem(List<Opportunity> opps, Map<Id, Opportunity> oldMap) { /* ... */ }
 }
 ```
+
+Note: Triggers always run in System Mode (all API versions). The handler class enforces sharing and access control. Always declare `with sharing`, `without sharing`, or `inherited sharing` explicitly on handler classes — since API v67.0, omitting the declaration defaults to `with sharing`.
 
 ---
 
@@ -269,39 +271,63 @@ Always wrap the method under test in `Test.startTest()` / `Test.stopTest()` to g
 
 ---
 
-## Security
+## Security — Access Modes (Summer '26 / API v67.0)
 
-### WITH SECURITY_ENFORCED
+Since API v67.0, database operations run in **User Mode by default** — they enforce the current user's CRUD, FLS, and sharing. In v66.0 and earlier, they default to System Mode. Always set access mode explicitly.
+
+### SOQL/SOSL — WITH USER_MODE / WITH SYSTEM_MODE
 
 ```apex
 List<Account> accounts = [
     SELECT Id, Name, Phone
     FROM Account
     WHERE Industry = 'Technology'
-    WITH SECURITY_ENFORCED
+    WITH USER_MODE
 ];
 ```
 
-Throws `System.QueryException` if user lacks field/object access. Use for read operations where you want strict enforcement.
+Use `WITH SYSTEM_MODE` only when intentionally bypassing security (e.g., system-level operations).
+
+Note: `WITH SECURITY_ENFORCED` is removed in API v67.0 — it will not compile. Use `WITH USER_MODE` instead.
+
+### DML — as user / as system
+
+```apex
+Account acc = new Account(Name = 'Acme');
+insert as user acc;
+
+update as system systemRecord;
+```
+
+For Database methods, use the `AccessLevel` parameter:
+
+```apex
+Database.insert(records, false, AccessLevel.USER_MODE);
+List<Account> results = Database.query(
+    'SELECT Id, Name FROM Account WHERE Rating = \'Hot\'',
+    AccessLevel.USER_MODE
+);
+```
 
 ### Security.stripInaccessible()
 
 ```apex
-List<Account> accounts = [SELECT Id, Name, Phone, Revenue__c FROM Account];
+List<Account> accounts = [SELECT Id, Name, Phone, Revenue__c FROM Account WITH SYSTEM_MODE];
 SObjectAccessDecision decision = Security.stripInaccessible(AccessType.READABLE, accounts);
 List<Account> sanitized = decision.getRecords();
 ```
 
-Silently removes inaccessible fields instead of throwing. Use when you want graceful degradation.
+Silently removes inaccessible fields instead of throwing. Use when you need System Mode query results filtered for a specific user's access.
 
-### User mode database operations (Spring '23+)
+### Sharing declarations — always explicit
 
 ```apex
-List<Account> accounts = [SELECT Id, Name FROM Account WITH USER_MODE];
-Database.insert(records, AccessLevel.USER_MODE);
+public with sharing class AccountService { /* enforces sharing rules */ }
+public without sharing class SystemService { /* bypasses sharing — use sparingly */ }
+public inherited sharing class UtilityClass { /* inherits from caller */ }
 ```
 
-Enforces CRUD, FLS, and sharing in a single declaration. Preferred for new code.
+Since API v67.0, classes without an explicit sharing declaration default to `with sharing`. Always declare it explicitly to avoid behavior changes on API version upgrade.
 
 ---
 
@@ -389,3 +415,34 @@ public with sharing class OrderService {
 ```
 
 Custom exception classes for each service. Use Savepoints for multi-step DML. Catch specific exceptions, not generic `Exception`.
+
+---
+
+## Multiline Strings and String Interpolation (Summer '26)
+
+### Multiline strings
+
+```apex
+String json = '''
+{
+    "name": "John Doe",
+    "type": "New Customer"
+}''';
+```
+
+Use triple single quotes (`'''`) to declare strings spanning multiple lines. Available in all API versions since Summer '26.
+
+### String.template() — named variable interpolation
+
+```apex
+String body = '''
+{
+    "Account": "${accountName}",
+    "Updated": "${date}"
+}'''.template(new Map<String, Object>{
+    'accountName' => acc.Name,
+    'date' => DateTime.now()
+});
+```
+
+Use `String.template()` with named `${variable}` placeholders instead of `String.format()` with index-based `{0}` placeholders. Keys map to descriptive names, making the code easier to read and maintain.

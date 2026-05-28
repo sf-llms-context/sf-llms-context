@@ -50,16 +50,16 @@ npx @sf-llms/context
 |---|---|
 | `patterns/deprecated.md` | What AI must NOT generate — deprecated patterns with correct alternatives |
 | `patterns/apex-best-practices.md` | Current Apex patterns and idioms |
-| `limits/governor-limits.md` | Current governor limit numbers (Summer '25 / v64.0) |
+| `limits/governor-limits.md` | Current governor limit numbers (Summer '26 / v67.0) |
 | `api/rest-api.md` | REST API patterns *(Phase 2)* |
 | `api/bulk-api.md` | Bulk API 2.0 patterns *(Phase 2)* |
 | `releases/current.md` | Latest release summary *(Phase 2)* |
 
 ## Current Salesforce version
 
-- **Release:** Summer '25
-- **API version:** v64.0
-- **Next release:** Winter '26 (Oct 2025)
+- **Release:** Summer '26
+- **API version:** v67.0
+- **Next release:** Winter '27 (Oct 2026)
 
 ## Contributing
 

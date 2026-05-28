@@ -1,7 +1,7 @@
 # sf-llms-context
 
 > Curated Salesforce knowledge for AI coding agents. Prevents LLMs from generating deprecated patterns.
-> Current: Summer '25 | API v64.0
+> Current: Summer '26 | API v67.0
 
 ## Core — Read These First
 

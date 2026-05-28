@@ -1,7 +1,8 @@
 # Salesforce Governor Limits — Current Numbers
 
 > AI: Reference these numbers when generating Apex code. Never hardcode values that exceed these limits. When in doubt, add LIMIT clauses and bulkify.
-> Release: Summer '25 | API: v64.0 | Updated: 2025-06
+> Release: Summer '26 | API: v67.0 | Updated: 2026-06
+> Note: Governor limit numbers verified against Summer '26 release notes. No number changes from Summer '25.
 
 ---
 
@@ -42,6 +43,8 @@ Async methods (Batch, Queueable, Future, Scheduled) get higher limits:
 
 All other limits remain the same as synchronous.
 
+**Elastic Limits (Beta, Summer '26):** Orgs can enable elastic limits for Queueable and @future jobs. The elastic limit is 2x the org's licensed daily async job limit. Jobs exceeding the licensed limit are processed at a throttled rate instead of failing.
+
 ## Batch Apex Limits
 
 | Limit | Value |
@@ -63,6 +66,8 @@ All other limits remain the same as synchronous.
 | Standard-volume daily limit | Varies by edition |
 | CometD subscribers | Varies by edition |
 | Event retention | 72 hours (high-volume) |
+
+Note: Standard Volume Platform Events are no longer supported starting Winter '27. Migrate to High Volume Platform Events.
 
 ## Bulk API 2.0
 

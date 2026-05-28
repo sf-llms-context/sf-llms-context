@@ -1,7 +1,7 @@
 # Deprecated Salesforce Patterns — Do NOT Generate These
 
 > AI: Read this file FIRST before generating any Salesforce code. Every pattern here is wrong. Use the GOOD alternative instead.
-> Release: Summer '25 | API: v64.0 | Updated: 2025-06
+> Release: Summer '26 | API: v67.0 | Updated: 2026-06
 
 ---
 
@@ -65,7 +65,7 @@ trigger AccountTrigger on Account (before insert, before update, after insert, a
 }
 ```
 ```apex
-public class AccountTriggerHandler {
+public with sharing class AccountTriggerHandler {
     public static void run(System.TriggerOperation operation, List<Account> newList, Map<Id, Account> oldMap) {
         switch on operation {
             when BEFORE_INSERT, BEFORE_UPDATE {
@@ -113,7 +113,7 @@ Id priceBookId = config.PriceBookId__c;
 ```
 - WHY: IDs are org-specific. Use queries, Custom Metadata Types, or Custom Labels.
 
-### Without sharing by default
+### Missing explicit sharing declaration
 
 - BAD:
 ```apex
@@ -131,7 +131,33 @@ public with sharing class AccountService {
     }
 }
 ```
-- WHY: `without sharing` bypasses record-level security. Default to `with sharing`. Use `without sharing` only when explicitly needed (e.g., system-level operations).
+- WHY: Since API v67.0 (Summer '26), classes without an explicit sharing declaration default to `with sharing`. In v66.0 and earlier, they default to `without sharing`. Always declare sharing explicitly (`with sharing`, `without sharing`, or `inherited sharing`) to make intent clear and avoid behavior changes on API version upgrade.
+
+### WITH SECURITY_ENFORCED (removed in v67.0)
+
+- BAD:
+```apex
+List<Account> accounts = [SELECT Id, Name FROM Account WITH SECURITY_ENFORCED];
+```
+- GOOD:
+```apex
+List<Account> accounts = [SELECT Id, Name FROM Account WITH USER_MODE];
+```
+- WHY: `WITH SECURITY_ENFORCED` is removed in API v67.0+ — code using it will not compile. Use `WITH USER_MODE` instead. It has better error reporting (returns all FLS errors, not just the first) and handles polymorphic fields correctly.
+
+### Database operations without explicit access mode
+
+- BAD:
+```apex
+List<Account> accounts = [SELECT Id, Name FROM Account];
+insert accounts;
+```
+- GOOD:
+```apex
+List<Account> accounts = [SELECT Id, Name FROM Account WITH USER_MODE];
+insert as user accounts;
+```
+- WHY: Since API v67.0 (Summer '26), database operations default to User Mode — they enforce the current user's CRUD, FLS, and sharing. In v66.0 and earlier, they default to System Mode. Always set access mode explicitly (`WITH USER_MODE`/`WITH SYSTEM_MODE` for queries, `as user`/`as system` for DML) to make intent clear.
 
 ### String concatenation in SOQL
 
@@ -196,6 +222,28 @@ public class RecordProcessor implements Queueable {
 }
 ```
 - WHY: Queueable supports chaining, complex parameters, and job monitoring. `@future` is fire-and-forget only.
+
+### String concatenation for multiline text
+
+- BAD:
+```apex
+String json = '{\n' +
+    '  "Name": "' + acc.Name + '",\n' +
+    '  "Type": "' + acc.Type + '"\n' +
+    '}';
+```
+- GOOD:
+```apex
+String json = '''
+{
+  "Name": "${name}",
+  "Type": "${type}"
+}'''.template(new Map<String, Object>{
+    'name' => acc.Name,
+    'type' => acc.Type
+});
+```
+- WHY: Apex now supports multiline strings (triple single quotes `'''`) and `String.template()` with named `${variable}` placeholders. Available in all API versions since Summer '26.
 
 ### Workflow Rules
 
@@ -439,15 +487,15 @@ for (Account acc : accounts) {
 
 ### Outdated API versions
 
-- BAD: Using API version below v55.0 in any new code, metadata, or integration.
-- GOOD: Use API version v64.0 (Summer '25) for all new work.
-- WHY: Old API versions miss security fixes, new features, and bug fixes. Salesforce retires old versions periodically.
+- BAD: Using API version below v67.0 in any new code, metadata, or integration.
+- GOOD: Use API version v67.0 (Summer '26) for all new work.
+- WHY: API versions 31.0–40.0 are being retired in Summer '26. Old API versions miss security fixes, new features, and the v67.0 security model improvements (User Mode by default, sharing by default). Salesforce actively retires old versions.
 
 ### SOAP API for new integrations
 
 - BAD: Using SOAP API (enterprise.wsdl / partner.wsdl) for new integrations.
 - GOOD: Use REST API for real-time operations. Use Bulk API 2.0 for data loading (>2,000 records).
-- WHY: SOAP API is legacy. REST API is simpler, supports JSON, and has better tooling support.
+- WHY: SOAP API is legacy. REST API is simpler, supports JSON, and has better tooling. Additionally, SOAP API `login()` call for versions 31.0–64.0 is being retired in Summer '27.
 
 ### Bulk API 1.0
 
@@ -460,6 +508,24 @@ for (Account acc : accounts) {
 - BAD: Sending >25 subrequests in a single Composite API call without checking limits.
 - GOOD: Batch subrequests into groups of 25. Use `allOrNone` parameter for transaction control.
 - WHY: Composite API maximum is 25 subrequests per call. Exceeding this returns an error.
+
+### Standard Volume Platform Events
+
+- BAD: Creating or using Standard Volume Platform Events.
+- GOOD: Use High Volume Platform Events. Migrate existing ones with the Salesforce migration tool (Tooling API or Metadata API).
+- WHY: Standard Volume Platform Events are no longer supported starting Winter '27. Migrate before then — unmigrated events will stop working.
+
+### OAuth 2.0 username-password flow
+
+- BAD: Using the OAuth 2.0 username-password flow for Connected App integrations.
+- GOOD: Use the OAuth 2.0 web-server flow (authorization code) or client credentials flow.
+- WHY: Username-password flow is being retired in Winter '27. It bypasses MFA and is a security risk.
+
+### Salesforce to Salesforce
+
+- BAD: Using Salesforce to Salesforce for org-to-org data sharing.
+- GOOD: Use Partner Cloud, Data Cloud, MuleSoft Anypoint, or MuleSoft for Flow.
+- WHY: Salesforce to Salesforce is being retired in Spring '27.
 
 ---
 
@@ -485,7 +551,8 @@ for (Account acc : accounts) {
 # Salesforce Governor Limits — Current Numbers
 
 > AI: Reference these numbers when generating Apex code. Never hardcode values that exceed these limits. When in doubt, add LIMIT clauses and bulkify.
-> Release: Summer '25 | API: v64.0 | Updated: 2025-06
+> Release: Summer '26 | API: v67.0 | Updated: 2026-06
+> Note: Governor limit numbers verified against Summer '26 release notes. No number changes from Summer '25.
 
 ---
 
@@ -526,6 +593,8 @@ Async methods (Batch, Queueable, Future, Scheduled) get higher limits:
 
 All other limits remain the same as synchronous.
 
+**Elastic Limits (Beta, Summer '26):** Orgs can enable elastic limits for Queueable and @future jobs. The elastic limit is 2x the org's licensed daily async job limit. Jobs exceeding the licensed limit are processed at a throttled rate instead of failing.
+
 ## Batch Apex Limits
 
 | Limit | Value |
@@ -547,6 +616,8 @@ All other limits remain the same as synchronous.
 | Standard-volume daily limit | Varies by edition |
 | CometD subscribers | Varies by edition |
 | Event retention | 72 hours (high-volume) |
+
+Note: Standard Volume Platform Events are no longer supported starting Winter '27. Migrate to High Volume Platform Events.
 
 ## Bulk API 2.0
 
@@ -601,8 +672,8 @@ These are the limits AI-generated code violates most frequently:
 5. **Heap 6MB limit** — Don't load large datasets into memory. Use Batch Apex for large volumes.
 # Apex Best Practices — Current Patterns
 
-> AI: Use these patterns when generating Apex code. These are the current recommended approaches for Summer '25.
-> Release: Summer '25 | API: v64.0 | Updated: 2025-06
+> AI: Use these patterns when generating Apex code. These are the current recommended approaches for Summer '26.
+> Release: Summer '26 | API: v67.0 | Updated: 2026-06
 
 ---
 
@@ -650,6 +721,8 @@ public with sharing class OpportunityTriggerHandler {
     private static void syncExternalSystem(List<Opportunity> opps, Map<Id, Opportunity> oldMap) { /* ... */ }
 }
 ```
+
+Note: Triggers always run in System Mode (all API versions). The handler class enforces sharing and access control. Always declare `with sharing`, `without sharing`, or `inherited sharing` explicitly on handler classes — since API v67.0, omitting the declaration defaults to `with sharing`.
 
 ---
 
@@ -870,39 +943,63 @@ Always wrap the method under test in `Test.startTest()` / `Test.stopTest()` to g
 
 ---
 
-## Security
+## Security — Access Modes (Summer '26 / API v67.0)
 
-### WITH SECURITY_ENFORCED
+Since API v67.0, database operations run in **User Mode by default** — they enforce the current user's CRUD, FLS, and sharing. In v66.0 and earlier, they default to System Mode. Always set access mode explicitly.
+
+### SOQL/SOSL — WITH USER_MODE / WITH SYSTEM_MODE
 
 ```apex
 List<Account> accounts = [
     SELECT Id, Name, Phone
     FROM Account
     WHERE Industry = 'Technology'
-    WITH SECURITY_ENFORCED
+    WITH USER_MODE
 ];
 ```
 
-Throws `System.QueryException` if user lacks field/object access. Use for read operations where you want strict enforcement.
+Use `WITH SYSTEM_MODE` only when intentionally bypassing security (e.g., system-level operations).
+
+Note: `WITH SECURITY_ENFORCED` is removed in API v67.0 — it will not compile. Use `WITH USER_MODE` instead.
+
+### DML — as user / as system
+
+```apex
+Account acc = new Account(Name = 'Acme');
+insert as user acc;
+
+update as system systemRecord;
+```
+
+For Database methods, use the `AccessLevel` parameter:
+
+```apex
+Database.insert(records, false, AccessLevel.USER_MODE);
+List<Account> results = Database.query(
+    'SELECT Id, Name FROM Account WHERE Rating = \'Hot\'',
+    AccessLevel.USER_MODE
+);
+```
 
 ### Security.stripInaccessible()
 
 ```apex
-List<Account> accounts = [SELECT Id, Name, Phone, Revenue__c FROM Account];
+List<Account> accounts = [SELECT Id, Name, Phone, Revenue__c FROM Account WITH SYSTEM_MODE];
 SObjectAccessDecision decision = Security.stripInaccessible(AccessType.READABLE, accounts);
 List<Account> sanitized = decision.getRecords();
 ```
 
-Silently removes inaccessible fields instead of throwing. Use when you want graceful degradation.
+Silently removes inaccessible fields instead of throwing. Use when you need System Mode query results filtered for a specific user's access.
 
-### User mode database operations (Spring '23+)
+### Sharing declarations — always explicit
 
 ```apex
-List<Account> accounts = [SELECT Id, Name FROM Account WITH USER_MODE];
-Database.insert(records, AccessLevel.USER_MODE);
+public with sharing class AccountService { /* enforces sharing rules */ }
+public without sharing class SystemService { /* bypasses sharing — use sparingly */ }
+public inherited sharing class UtilityClass { /* inherits from caller */ }
 ```
 
-Enforces CRUD, FLS, and sharing in a single declaration. Preferred for new code.
+Since API v67.0, classes without an explicit sharing declaration default to `with sharing`. Always declare it explicitly to avoid behavior changes on API version upgrade.
 
 ---
 
@@ -990,3 +1087,34 @@ public with sharing class OrderService {
 ```
 
 Custom exception classes for each service. Use Savepoints for multi-step DML. Catch specific exceptions, not generic `Exception`.
+
+---
+
+## Multiline Strings and String Interpolation (Summer '26)
+
+### Multiline strings
+
+```apex
+String json = '''
+{
+    "name": "John Doe",
+    "type": "New Customer"
+}''';
+```
+
+Use triple single quotes (`'''`) to declare strings spanning multiple lines. Available in all API versions since Summer '26.
+
+### String.template() — named variable interpolation
+
+```apex
+String body = '''
+{
+    "Account": "${accountName}",
+    "Updated": "${date}"
+}'''.template(new Map<String, Object>{
+    'accountName' => acc.Name,
+    'date' => DateTime.now()
+});
+```
+
+Use `String.template()` with named `${variable}` placeholders instead of `String.format()` with index-based `{0}` placeholders. Keys map to descriptive names, making the code easier to read and maintain.
