@@ -21,7 +21,7 @@ Salesforce releases 3x/year. AI training data lags 6–18 months. This project b
 Point your AI tool to:
 
 ```
-https://raw.githubusercontent.com/YOUR_USER/sf-llms-context/main/llms.txt
+https://raw.githubusercontent.com/sf-llms-context/sf-llms-context/main/llms.txt
 ```
 
 This is a lightweight index file that links to specific topic files.
@@ -31,7 +31,7 @@ This is a lightweight index file that links to specific topic files.
 Feed your AI agent the full context in one fetch:
 
 ```
-https://raw.githubusercontent.com/YOUR_USER/sf-llms-context/main/llms-full.txt
+https://raw.githubusercontent.com/sf-llms-context/sf-llms-context/main/llms-full.txt
 ```
 
 ### Method 3: Copy-paste
