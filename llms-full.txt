@@ -1353,3 +1353,1207 @@ String body = '''
 ```
 
 Use `String.template()` with named `${variable}` placeholders instead of `String.format()` with index-based `{0}` placeholders. Keys map to descriptive names, making the code easier to read and maintain.
+# LWC Best Practices — Current Patterns
+
+> AI: Use these patterns when generating Lightning Web Components. Default to Lightning Data Service over imperative Apex, use the modern `lwc:if`/`lwc:ref` syntax, and respect Lightning Web Security.
+> Release: Summer '26 | API: v67.0 | Updated: 2026-06
+
+---
+
+## Data Access — Prefer Lightning Data Service
+
+LDS handles caching, FLS, sharing, and cache invalidation across components automatically. Reach for imperative Apex only when LDS can't model the operation.
+
+### Reactive single record with `@wire(getRecord)`
+
+```javascript
+import { LightningElement, api, wire } from 'lwc';
+import { getRecord, getFieldValue } from 'lightning/uiRecordApi';
+import NAME_FIELD from '@salesforce/schema/Account.Name';
+import INDUSTRY_FIELD from '@salesforce/schema/Account.Industry';
+
+export default class AccountSummary extends LightningElement {
+    @api recordId;
+
+    @wire(getRecord, { recordId: '$recordId', fields: [NAME_FIELD, INDUSTRY_FIELD] })
+    account;
+
+    get name() {
+        return getFieldValue(this.account.data, NAME_FIELD);
+    }
+
+    get industry() {
+        return getFieldValue(this.account.data, INDUSTRY_FIELD);
+    }
+}
+```
+
+The `$` prefix makes `recordId` reactive — when it changes, the wire re-fires.
+
+### Edit a record with `lightning-record-form` / `lightning-record-edit-form`
+
+```html
+<!-- Simplest: full LDS-managed form -->
+<lightning-record-form
+    record-id={recordId}
+    object-api-name="Account"
+    fields={fields}
+    mode="edit">
+</lightning-record-form>
+
+<!-- More control: explicit field components, can wrap with custom layout -->
+<lightning-record-edit-form record-id={recordId} object-api-name="Account">
+    <lightning-input-field field-name="Name"></lightning-input-field>
+    <lightning-input-field field-name="Industry"></lightning-input-field>
+    <lightning-button type="submit" label="Save"></lightning-button>
+</lightning-record-edit-form>
+```
+
+LDS-managed forms automatically refresh other components wired to the same record.
+
+### Create / update / delete from JS
+
+```javascript
+import { createRecord, updateRecord, deleteRecord } from 'lightning/uiRecordApi';
+
+async handleCreate() {
+    const recordInput = {
+        apiName: 'Account',
+        fields: { Name: 'Acme', Industry: 'Technology' }
+    };
+    const account = await createRecord(recordInput);
+    // LDS cache and any @wire(getRecord) on this record are updated automatically
+}
+
+async handleUpdate() {
+    const fields = { Id: this.recordId, Industry: 'Finance' };
+    await updateRecord({ fields });
+}
+
+async handleDelete() {
+    await deleteRecord(this.recordId);
+}
+```
+
+### When to use imperative Apex
+
+Use imperative Apex calls when:
+- The operation isn't a simple CRUD on a standard sObject (custom logic, multi-step workflows)
+- You need a custom DTO shape
+- You need a callout (LDS can't call external services)
+- Aggregate or complex SOQL not expressible via LDS
+
+```javascript
+import { LightningElement, wire } from 'lwc';
+import getTopAccounts from '@salesforce/apex/AccountController.getTopAccounts';
+
+export default class TopAccounts extends LightningElement {
+    @wire(getTopAccounts, { limitSize: 10 })
+    accounts;
+}
+```
+
+Apex method must be `@AuraEnabled(cacheable=true)` to be `@wire`-compatible. Methods with `cacheable=false` (or omitted) must be invoked imperatively.
+
+---
+
+## Imperative Apex Call
+
+```javascript
+import { LightningElement } from 'lwc';
+import processOrder from '@salesforce/apex/OrderController.processOrder';
+import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+
+export default class OrderProcessor extends LightningElement {
+    async handleClick() {
+        try {
+            const result = await processOrder({ orderId: this.recordId });
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Success',
+                message: `Order ${result.orderNumber} processed`,
+                variant: 'success'
+            }));
+        } catch (error) {
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Error',
+                message: error.body?.message ?? error.message,
+                variant: 'error'
+            }));
+        }
+    }
+}
+```
+
+---
+
+## Conditional Rendering — `lwc:if` / `lwc:elseif` / `lwc:else`
+
+Use the modern directives. `if:true` / `if:false` were deprecated in v59.0 (Winter '24).
+
+```html
+<!-- ❌ Deprecated -->
+<template if:true={isLoading}>...</template>
+<template if:false={isLoading}>...</template>
+
+<!-- ✅ Current -->
+<template lwc:if={isLoading}>
+    <lightning-spinner></lightning-spinner>
+</template>
+<template lwc:elseif={hasError}>
+    <p class="slds-text-color_error">{errorMessage}</p>
+</template>
+<template lwc:else>
+    <div>{content}</div>
+</template>
+```
+
+---
+
+## Iteration — `for:each` and `iterator`
+
+```html
+<template for:each={accounts} for:item="acc" for:index="idx">
+    <li key={acc.Id}>{idx}: {acc.Name}</li>
+</template>
+
+<!-- iterator gives you isFirst/isLast for separators -->
+<template iterator:it={accounts}>
+    <li key={it.value.Id}>
+        <span lwc:if={it.first}>★ </span>
+        {it.value.Name}
+        <span lwc:if={it.last}>(last)</span>
+    </li>
+</template>
+```
+
+`key` must be unique and stable. Don't use array index as key — re-renders break.
+
+---
+
+## Querying the DOM — `lwc:ref`
+
+`lwc:ref` (Winter '24+) replaces `this.template.querySelector` in most cases.
+
+```html
+<template>
+    <lightning-input lwc:ref="email" label="Email"></lightning-input>
+    <lightning-input lwc:ref="phone" label="Phone"></lightning-input>
+</template>
+```
+
+```javascript
+validate() {
+    const email = this.refs.email;
+    const phone = this.refs.phone;
+    return email.checkValidity() && phone.checkValidity();
+}
+```
+
+Use `querySelector` only for dynamic selection (e.g., querying inside an iteration).
+
+---
+
+## Component Lifecycle
+
+```javascript
+import { LightningElement } from 'lwc';
+
+export default class LifecycleDemo extends LightningElement {
+    connectedCallback() {
+        // Component inserted into DOM — set up subscriptions, fetch initial data
+    }
+
+    renderedCallback() {
+        // After every render — keep logic minimal and idempotent (guard with a flag)
+        if (this.hasRendered) return;
+        this.hasRendered = true;
+        // one-time post-render setup
+    }
+
+    disconnectedCallback() {
+        // Component removed — unsubscribe, clear timers, release resources
+    }
+
+    errorCallback(error, stack) {
+        // Catches errors thrown from child component lifecycle hooks
+        console.error(error, stack);
+    }
+}
+```
+
+Never mutate reactive state in `renderedCallback` without a guard — causes infinite re-render loops.
+
+---
+
+## Reactivity
+
+Top-level field assignments are reactive automatically (no `@track` needed since v45).
+
+```javascript
+export default class ReactiveDemo extends LightningElement {
+    count = 0;          // reactive
+    user = { name: '' };  // reactive at top level
+
+    increment() {
+        this.count++;                          // ✅ triggers re-render
+        this.user = { ...this.user, name: 'Y' }; // ✅ triggers re-render (new object reference)
+        this.user.name = 'X';                  // ❌ no re-render — nested mutation
+    }
+}
+```
+
+For nested object/array mutations to trigger re-render, reassign the top-level field to a new reference.
+
+---
+
+## Custom Events
+
+```javascript
+// Child component dispatches
+this.dispatchEvent(new CustomEvent('select', {
+    detail: { accountId: this.accountId },
+    bubbles: true,        // bubble up the DOM
+    composed: false       // stay within the shadow boundary (default)
+}));
+```
+
+```html
+<!-- Parent listens -->
+<c-account-tile onselect={handleSelect}></c-account-tile>
+```
+
+```javascript
+handleSelect(event) {
+    const accountId = event.detail.accountId;
+}
+```
+
+- `composed: true` lets the event cross shadow DOM boundaries. Use sparingly — most cross-component communication should use LMS or `@api` methods on the parent.
+- Event names: lowercase, no dashes, no event-prefix (`accountselect`, not `account-select` or `onAccountSelect`).
+
+---
+
+## Cross-Component Messaging — Lightning Message Service
+
+LMS replaces pubsub for any communication between components that don't share a parent.
+
+```javascript
+// message channel: force-app/main/default/messageChannels/AccountSelected.messageChannel-meta.xml
+import { LightningElement, wire } from 'lwc';
+import { publish, subscribe, MessageContext } from 'lightning/messageService';
+import ACCOUNT_SELECTED from '@salesforce/messageChannel/AccountSelected__c';
+
+export default class Publisher extends LightningElement {
+    @wire(MessageContext) messageContext;
+
+    notify(accountId) {
+        publish(this.messageContext, ACCOUNT_SELECTED, { accountId });
+    }
+}
+
+export default class Subscriber extends LightningElement {
+    subscription = null;
+    @wire(MessageContext) messageContext;
+
+    connectedCallback() {
+        this.subscription = subscribe(
+            this.messageContext,
+            ACCOUNT_SELECTED,
+            (message) => this.handleMessage(message)
+        );
+    }
+
+    disconnectedCallback() {
+        if (this.subscription) {
+            unsubscribe(this.subscription);
+            this.subscription = null;
+        }
+    }
+}
+```
+
+---
+
+## Cache Refresh — `refreshApex` and `getRecordNotifyChange`
+
+After mutating data, the cache must be told to refetch.
+
+```javascript
+import { refreshApex } from '@salesforce/apex';
+import { getRecordNotifyChange } from 'lightning/uiRecordApi';
+
+@wire(getAccounts) wiredAccountsResult;
+
+async handleSave() {
+    await updateRecord({ fields: { Id: this.recordId, Name: 'New' } });
+
+    // ✅ Refresh imperatively-wired Apex result
+    await refreshApex(this.wiredAccountsResult);
+
+    // ✅ Notify LDS that a record changed (so other components re-fetch)
+    getRecordNotifyChange([{ recordId: this.recordId }]);
+}
+```
+
+`updateRecord` already invalidates LDS cache for that record — you only need `getRecordNotifyChange` when the change happened outside LDS (Apex callout, external system, custom action).
+
+---
+
+## Navigation
+
+```javascript
+import { NavigationMixin } from 'lightning/navigation';
+
+export default class NavDemo extends NavigationMixin(LightningElement) {
+    openAccount(accountId) {
+        this[NavigationMixin.Navigate]({
+            type: 'standard__recordPage',
+            attributes: { recordId: accountId, objectApiName: 'Account', actionName: 'view' }
+        });
+    }
+
+    openList() {
+        this[NavigationMixin.Navigate]({
+            type: 'standard__objectPage',
+            attributes: { objectApiName: 'Account', actionName: 'list' },
+            state: { filterName: 'Recent' }
+        });
+    }
+}
+```
+
+---
+
+## Toasts
+
+```javascript
+import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+
+this.dispatchEvent(new ShowToastEvent({
+    title: 'Saved',
+    message: 'Account updated successfully',
+    variant: 'success',    // 'info' | 'success' | 'warning' | 'error'
+    mode: 'dismissable'    // 'dismissable' | 'pester' | 'sticky'
+}));
+```
+
+Toasts only work in Lightning Experience and the Salesforce mobile app — they're no-ops in standalone Lightning Out apps.
+
+---
+
+## Public API — `@api`
+
+```javascript
+import { LightningElement, api } from 'lwc';
+
+export default class AccountTile extends LightningElement {
+    @api recordId;                              // public property
+    @api compact = false;                       // public property with default
+
+    @api focusFirstField() {                    // public method
+        this.refs.firstInput.focus();
+    }
+
+    // ❌ Don't mutate @api properties inside the component
+    @api count = 0;
+    increment() { this.count++; }               // anti-pattern — parent owns this value
+}
+```
+
+Public properties are read-only inside the component — the parent owns the value.
+
+---
+
+## GraphQL — `lightning/graphql`
+
+```javascript
+import { LightningElement, wire } from 'lwc';
+import { gql, graphql } from 'lightning/graphql';
+
+export default class AccountsGraph extends LightningElement {
+    @wire(graphql, {
+        query: gql`
+            query getAccounts {
+                uiapi {
+                    query {
+                        Account(where: { Industry: { eq: "Technology" } }, first: 10) {
+                            edges {
+                                node {
+                                    Id
+                                    Name { value }
+                                    AnnualRevenue { value }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        `
+    })
+    accounts;
+}
+```
+
+`lightning/uiGraphQLApi` is removed — use `lightning/graphql` (GA Summer '24).
+
+---
+
+## Loading External Resources
+
+```javascript
+import { loadScript, loadStyle } from 'lightning/platformResourceLoader';
+import CHARTJS from '@salesforce/resourceUrl/chartjs';
+
+async renderedCallback() {
+    if (this.chartInitialized) return;
+    this.chartInitialized = true;
+
+    await Promise.all([
+        loadScript(this, CHARTJS + '/chart.min.js'),
+        loadStyle(this, CHARTJS + '/chart.min.css')
+    ]);
+    this.renderChart();
+}
+```
+
+External libraries must run under **Lightning Web Security** (replaced Locker Service in Spring '23). Most modern libraries work without changes; legacy libraries that rely on `window`-level globals may need adapters.
+
+---
+
+## Common AI-Generated Mistakes
+
+| Mistake | Fix |
+|---|---|
+| `if:true={x}` / `if:false={x}` | Use `lwc:if={x}` / `lwc:elseif={x}` / `lwc:else` |
+| `this.template.querySelector('lightning-input')` for static refs | Use `lwc:ref` and `this.refs.name` |
+| `@track` on every field | Reactive by default since v45; only needed for deep observation of objects with `@track` (rare) |
+| `import { ... } from 'lightning/uiGraphQLApi'` | Use `lightning/graphql` |
+| Aura: `<aura:component>`, `c:childCmp` | LWC: `<template>`, `<c-child-cmp>` |
+| `pubsub` library imports | Use `lightning/messageService` (LMS) |
+| Mutating nested object/array fields and expecting re-render | Reassign top-level field with new reference |
+| Calling Apex `@wire` on `cacheable=false` method | Either invoke imperatively or set `cacheable=true` |
+| Custom event with dashes/camelCase: `onAccount-Select` | Lowercase, no dashes: `accountselect` |
+| Toast in Lightning Out app | Toasts only work in LEX / Salesforce mobile |
+| Forgetting `key={item.Id}` in `for:each` | Always provide a unique stable key |
+| Importing fields as strings: `fields: ['Account.Name']` | Use `@salesforce/schema/Account.Name` imports |
+# SOQL Best Practices — Current Patterns
+
+> AI: Use these patterns when generating SOQL queries (Apex, LWC `@wire`, REST, Bulk API). Focus on selectivity, bulkification, and the User Mode security model introduced in v67.0.
+> Release: Summer '26 | API: v67.0 | Updated: 2026-06
+
+---
+
+## Selective Filters
+
+A query is **selective** when its WHERE clause filters on an indexed field that returns < 10% of the records in the object (max 333,000 rows). Non-selective queries fail with `QueryException: Non-selective query against large object type` once the object exceeds ~200K records.
+
+### Indexed fields (selective by default)
+
+- `Id`, `Name`, `OwnerId`
+- All foreign keys (lookup / master-detail)
+- `RecordTypeId`
+- `CreatedDate`, `SystemModstamp`, `LastModifiedDate`
+- Audit fields: `CreatedById`, `LastModifiedById`
+- External ID fields
+- Unique fields
+- Custom indexes (request from Salesforce Support)
+
+### Filters that defeat indexes
+
+```apex
+// ❌ NOT selective — index can't be used
+[SELECT Id FROM Account WHERE Name != 'Acme'];
+[SELECT Id FROM Account WHERE NOT (Industry = 'Tech')];
+[SELECT Id FROM Account WHERE Industry = NULL];
+[SELECT Id FROM Account WHERE Phone LIKE '%555%'];        // leading wildcard
+[SELECT Id FROM Account WHERE AnnualRevenue + 100 > 1000]; // expression on indexed field
+[SELECT Id FROM Opportunity WHERE TotalAmount__c > 0];     // formula field
+```
+
+```apex
+// ✅ Selective
+[SELECT Id FROM Account WHERE Industry = 'Tech'];
+[SELECT Id FROM Account WHERE Name LIKE 'Acme%'];          // trailing wildcard OK
+[SELECT Id FROM Account WHERE CreatedDate = TODAY];
+[SELECT Id FROM Opportunity WHERE Amount > 0];             // standard numeric field
+```
+
+### Check selectivity with the Query Plan tool
+
+Use **Developer Console → Query Editor → Query Plan** (or REST API `/services/data/v67.0/query/?explain=...`) to see cost. Cost > 1.0 = not selective.
+
+---
+
+## Bind Variables (SOQL Injection Prevention)
+
+```apex
+// ❌ String concat — SOQL injection vulnerability
+String query = 'SELECT Id FROM Account WHERE Name = \'' + userInput + '\'';
+List<Account> accounts = Database.query(query);
+```
+
+```apex
+// ✅ Bind variables in static SOQL
+String accountName = userInput;
+List<Account> accounts = [SELECT Id FROM Account WHERE Name = :accountName];
+
+// ✅ Bind variables in dynamic SOQL (v54.0+)
+Map<String, Object> binds = new Map<String, Object>{ 'accountName' => userInput };
+List<Account> accounts = Database.queryWithBinds(
+    'SELECT Id FROM Account WHERE Name = :accountName',
+    binds,
+    AccessLevel.USER_MODE
+);
+
+// ✅ Sanitize when concatenation is unavoidable (rare)
+String safeInput = String.escapeSingleQuotes(userInput);
+```
+
+---
+
+## User Mode (Security Enforcement)
+
+Since API v67.0, query in **User Mode** to enforce CRUD, FLS, and sharing automatically. `WITH SECURITY_ENFORCED` is removed — use `WITH USER_MODE` (SOQL clause) or `AccessLevel.USER_MODE` (Apex parameter).
+
+```apex
+// ❌ Old patterns
+[SELECT Id, Name FROM Account WITH SECURITY_ENFORCED];
+Account a = Security.stripInaccessible(AccessType.READABLE, [SELECT Id, Name FROM Account]).getRecords()[0];
+```
+
+```apex
+// ✅ Static SOQL with USER_MODE clause
+List<Account> accounts = [SELECT Id, Name FROM Account WITH USER_MODE];
+
+// ✅ Dynamic SOQL with AccessLevel
+List<Account> accounts = Database.query(
+    'SELECT Id, Name FROM Account',
+    AccessLevel.USER_MODE
+);
+
+// ✅ System Mode when justified (no FLS/sharing)
+List<Account> accounts = [SELECT Id, Name FROM Account WITH SYSTEM_MODE];
+```
+
+---
+
+## Relationship Queries
+
+### Parent-to-child (subqueries)
+
+```apex
+List<Account> accounts = [
+    SELECT Id, Name,
+        (SELECT Id, Email FROM Contacts WHERE Email != null)
+    FROM Account
+    WHERE Industry = 'Tech'
+    LIMIT 100
+];
+
+for (Account acc : accounts) {
+    for (Contact c : acc.Contacts) {
+        // child records pre-loaded — no extra query
+    }
+}
+```
+
+Limits: max 20 parent-to-child relationships per query; max 5 levels deep (v58.0+).
+
+### Child-to-parent (dot notation)
+
+```apex
+List<Contact> contacts = [
+    SELECT Id, Name, Account.Name, Account.Owner.Name
+    FROM Contact
+    WHERE Account.Industry = 'Tech'
+];
+```
+
+Limit: max 55 child-to-parent relationships per query.
+
+### Polymorphic lookups (TYPEOF)
+
+```apex
+List<Task> tasks = [
+    SELECT Id, Subject,
+        TYPEOF What
+            WHEN Account THEN Name, Industry
+            WHEN Opportunity THEN Name, Amount, StageName
+            ELSE Id
+        END
+    FROM Task
+    WHERE What.Type IN ('Account', 'Opportunity')
+];
+```
+
+---
+
+## Aggregates
+
+```apex
+// COUNT
+Integer total = [SELECT COUNT() FROM Account WHERE Industry = 'Tech'];
+
+// GROUP BY with AggregateResult
+List<AggregateResult> results = [
+    SELECT Industry, COUNT(Id) cnt, SUM(AnnualRevenue) revenue
+    FROM Account
+    WHERE Industry != null
+    GROUP BY Industry
+    HAVING COUNT(Id) > 10
+];
+
+for (AggregateResult ar : results) {
+    String industry = (String) ar.get('Industry');
+    Integer count = (Integer) ar.get('cnt');
+    Decimal revenue = (Decimal) ar.get('revenue');
+}
+
+// COUNT_DISTINCT
+Integer distinctOwners = [SELECT COUNT_DISTINCT(OwnerId) FROM Account];
+
+// GROUP BY ROLLUP / CUBE
+List<AggregateResult> totals = [
+    SELECT Industry, Type, COUNT(Id) cnt
+    FROM Account
+    GROUP BY ROLLUP(Industry, Type)
+];
+```
+
+`HAVING` filters aggregated groups; `WHERE` filters rows before aggregation. Aggregate queries count against the SOQL query limit (1 query) but the rows returned count against the 50,000 row limit.
+
+---
+
+## Date Literals
+
+```apex
+[SELECT Id FROM Opportunity WHERE CloseDate = TODAY];
+[SELECT Id FROM Opportunity WHERE CloseDate = YESTERDAY];
+[SELECT Id FROM Opportunity WHERE CloseDate = THIS_WEEK];
+[SELECT Id FROM Opportunity WHERE CloseDate = LAST_N_DAYS:30];
+[SELECT Id FROM Opportunity WHERE CloseDate = NEXT_FISCAL_QUARTER];
+[SELECT Id FROM Opportunity WHERE CreatedDate >= LAST_N_DAYS:7 AND CreatedDate <= TODAY];
+
+// Bind a Date value
+Date cutoff = Date.today().addDays(-30);
+[SELECT Id FROM Account WHERE CreatedDate >= :cutoff];
+
+// Bind a DateTime (note format: YYYY-MM-DDTHH:MM:SSZ when serialized)
+Datetime since = Datetime.now().addHours(-1);
+[SELECT Id FROM Account WHERE SystemModstamp >= :since];
+```
+
+Date literals are evaluated by the server in the user's locale/timezone. Don't construct date strings manually — use literals or bind variables.
+
+---
+
+## LIMIT, OFFSET, and Pagination
+
+```apex
+// ✅ Always cap result size when records aren't expected to be bounded
+List<Account> recent = [SELECT Id, Name FROM Account ORDER BY CreatedDate DESC LIMIT 200];
+
+// ⚠️ OFFSET is allowed but capped at 2,000 and slow for large datasets
+List<Account> page2 = [SELECT Id FROM Account ORDER BY Id LIMIT 50 OFFSET 50];
+
+// ✅ Keyset pagination — fast, no OFFSET cap
+Id lastId = ...;
+List<Account> nextPage = [
+    SELECT Id, Name FROM Account
+    WHERE Id > :lastId
+    ORDER BY Id
+    LIMIT 200
+];
+```
+
+For paginating large result sets, prefer **Apex Cursors** (Spring '26, see below) over OFFSET.
+
+---
+
+## Cursors (Spring '26, API v66.0+)
+
+Cursors let you query once and consume results in chunks across multiple transactions — without re-querying.
+
+```apex
+public class AccountProcessor implements Queueable {
+    private Database.Cursor cursor;
+    private Integer position;
+
+    public AccountProcessor() {
+        this.cursor = Database.getCursor(
+            'SELECT Id, Name, AnnualRevenue FROM Account WHERE Industry = \'Tech\' ORDER BY Id'
+        );
+        this.position = 0;
+    }
+
+    public AccountProcessor(Database.Cursor cursor, Integer position) {
+        this.cursor = cursor;
+        this.position = position;
+    }
+
+    public void execute(QueueableContext ctx) {
+        List<Account> chunk = (List<Account>) cursor.fetch(position, 200);
+        if (chunk.isEmpty()) return;
+
+        // process chunk
+        for (Account acc : chunk) { /* ... */ }
+
+        if (cursor.getNumRecords() > position + 200) {
+            System.enqueueJob(new AccountProcessor(cursor, position + 200));
+        }
+    }
+}
+```
+
+Use cursors when: result set > 50K rows but < 50M, you need precise control over chunk size, and Batch Apex granularity is too coarse. Limits: 50M rows per cursor, 100 `fetch()` calls per transaction, 10K cursors per 24h.
+
+---
+
+## Database.getQueryLocator (Batch Apex)
+
+```apex
+public class OldAccountCleanup implements Database.Batchable<SObject> {
+    public Database.QueryLocator start(Database.BatchableContext bc) {
+        return Database.getQueryLocator([
+            SELECT Id, Name, LastActivityDate
+            FROM Account
+            WHERE LastActivityDate < LAST_N_DAYS:365
+        ]);
+    }
+
+    public void execute(Database.BatchableContext bc, List<Account> scope) {
+        // scope size set in executeBatch(job, scopeSize)
+    }
+
+    public void finish(Database.BatchableContext bc) {}
+}
+```
+
+`Database.getQueryLocator` bypasses the 50,000 row limit (up to 50M rows). Use for Batch Apex only.
+
+---
+
+## FOR UPDATE (Pessimistic Locking)
+
+```apex
+// ✅ Lock records to prevent concurrent modification
+List<Account> accounts = [
+    SELECT Id, Status__c FROM Account
+    WHERE Id IN :accountIds
+    FOR UPDATE
+];
+
+for (Account acc : accounts) {
+    acc.Status__c = 'Processed';
+}
+update accounts;
+```
+
+Use sparingly. `FOR UPDATE`:
+- Blocks other transactions trying to lock the same rows (5-second timeout)
+- Doesn't work with `ORDER BY`, `GROUP BY`, aggregate queries, or relationship queries
+- Helps prevent lost-update races in concurrent triggers/queueable chains
+
+---
+
+## Picklist Labels and Currencies
+
+```apex
+// toLabel() — get translated picklist label instead of API value
+List<Account> accounts = [
+    SELECT Id, toLabel(Industry) IndustryLabel
+    FROM Account
+];
+
+// FORMAT() — format numbers and dates per user locale
+List<Opportunity> opps = [
+    SELECT Id, FORMAT(Amount) AmountStr, FORMAT(CloseDate) CloseDateStr
+    FROM Opportunity
+];
+
+// convertCurrency() — return values in user's currency (multi-currency orgs)
+List<Opportunity> opps = [
+    SELECT Id, convertCurrency(Amount) AmountInUserCurrency
+    FROM Opportunity
+];
+```
+
+---
+
+## ALL ROWS (Including Deleted/Archived)
+
+```apex
+// Standard query — excludes soft-deleted records
+Integer active = [SELECT COUNT() FROM Account];
+
+// Include records in Recycle Bin + archived
+Integer all = [SELECT COUNT() FROM Account ALL ROWS];
+```
+
+Use for audit/recovery flows only. `ALL ROWS` is incompatible with `FOR UPDATE`.
+
+---
+
+## USING SCOPE
+
+```apex
+// Records the running user owns
+List<Account> mine = [SELECT Id FROM Account USING SCOPE Mine LIMIT 100];
+
+// Records the running user has explicit access to
+List<Account> delegated = [SELECT Id FROM Account USING SCOPE Delegated LIMIT 100];
+
+// Records owned by the user or their subordinates in the role hierarchy
+List<Account> team = [SELECT Id FROM Account USING SCOPE Team LIMIT 100];
+```
+
+`USING SCOPE` works without manual sharing filter logic — server handles ownership/hierarchy.
+
+---
+
+## SOSL vs SOQL
+
+Use **SOSL** when you need full-text search across multiple object types; use SOQL when you know the object and want structured filtering.
+
+```apex
+// ✅ SOSL — searches indexed text fields across multiple objects
+List<List<SObject>> results = [
+    FIND 'Acme*' IN NAME FIELDS
+    RETURNING Account(Id, Name), Contact(Id, Email), Opportunity(Id, StageName)
+    LIMIT 50
+];
+List<Account> accounts = (List<Account>) results[0];
+List<Contact> contacts = (List<Contact>) results[1];
+List<Opportunity> opps = (List<Opportunity>) results[2];
+```
+
+SOSL limits per transaction: 20 queries, 2,000 rows per query.
+
+---
+
+## Common AI-Generated Mistakes
+
+| Mistake | Fix |
+|---|---|
+| `SELECT * FROM Account` | SOQL has no `*`. List every field explicitly or use `Schema.SObjectType.Account.fields.getMap()` |
+| Hardcoded RecordType IDs | Use `Schema.SObjectType.Account.getRecordTypeInfosByDeveloperName().get('Partner').getRecordTypeId()` |
+| Query in a `for` loop | Move query outside loop; build a Map<Id, Object> for lookups |
+| Missing `LIMIT` on unbounded queries | Always add `LIMIT` for queries that may grow with data volume |
+| `WHERE Id IN :hugeSet` with 10K+ ids | Batch the set into chunks of ≤200 IDs |
+| Filtering on formula fields | Add a custom indexed field or restructure the data model |
+| `ORDER BY` without indexed field | Sort in Apex after query, or index the sort field |
+| String concat for dynamic SOQL | Use `Database.queryWithBinds` with a binds map |
+# Flow Best Practices — Current Patterns
+
+> AI: Use these patterns when designing Flow Builder automations. Flow is the only declarative automation tool — Workflow Rules and Process Builder are retired.
+> Release: Summer '26 | API: v67.0 | Updated: 2026-06
+
+---
+
+## Choose the Right Flow Type
+
+| Type | When to use |
+|---|---|
+| **Record-Triggered Flow** | Logic that runs when a record is created, updated, or deleted. Replaces Workflow Rules and Process Builder. |
+| **Schedule-Triggered Flow** | Recurring batch logic (daily/weekly cleanup, scheduled syncs). Replaces Schedulable Apex for simple cases. |
+| **Platform Event–Triggered Flow** | Subscribe to platform events for event-driven integrations. |
+| **Screen Flow** | Multi-step UI wizards, embedded in Lightning pages or community sites. |
+| **Autolaunched Flow (no trigger)** | Called from Apex, REST, subflow, action button. Reusable business logic. |
+| **Approval Process** | (deprecated for new work — model approvals in Record-Triggered Flow with custom fields or Approvals in Flow.) |
+
+---
+
+## Record-Triggered Flow — Choose the Right Stage
+
+### Before-save (Fast Field Updates)
+
+Use when the flow **only updates fields on the triggering record itself**. Runs ~10× faster than after-save and avoids extra DML.
+
+```
+Trigger: A record is updated
+Optimize for: Fast Field Updates
+Run flow when: A record is created or updated
+Entry condition: Status = 'Closed Won'
+
+Steps:
+1. Decision: Was Amount changed?
+2. Assignment: $Record.Commission__c = $Record.Amount * 0.1
+   (No "Update Records" element needed — the change is saved automatically)
+```
+
+Before-save flows **cannot**:
+- Make callouts
+- Send emails
+- Update related records
+- Call subflows that do any of the above
+
+### After-save (Actions and Related Records)
+
+Use when you need to update related records, create new records, send emails, or call Apex.
+
+```
+Trigger: A record is updated
+Optimize for: Actions and Related Records
+Run flow when: A record is created or updated
+
+Steps:
+1. Decision: Was StageName changed to 'Closed Won'?
+2. Get Records: Contacts where AccountId = $Record.AccountId
+3. Loop: For each contact, add to "high-value contacts" collection
+4. Update Records: Apply collection (one DML for all contacts)
+```
+
+### Async Path
+
+Use for callouts and long-running logic. The async path runs after the original transaction commits, so it has its own governor limits and can make callouts.
+
+---
+
+## Bulkification
+
+Flow auto-bulkifies records that trigger the same flow in one transaction. **Your job: don't break it with DML inside loops.**
+
+```
+❌ BAD — DML inside loop = 1 SOQL/DML per iteration
+
+Loop: For each opportunity in collection
+    └── Get Records: Account where Id = currentOpportunity.AccountId
+    └── Update Records: Set Account.Last_Opp_Date__c
+End Loop
+```
+
+```
+✅ GOOD — collect, then bulk DML
+
+Loop: For each opportunity in collection
+    └── Assignment: Add { Id: opp.AccountId, Last_Opp_Date__c: TODAY }
+                    to accountsToUpdate collection
+End Loop
+Update Records: accountsToUpdate (one DML, all records)
+```
+
+Same principle for Get Records: collect IDs in a Set first, then make one `Get Records WHERE Id IN <collection>` call.
+
+---
+
+## Fault Paths
+
+Every Get/Create/Update/Delete element can fail (validation rule, FLS, lock contention). Add a Fault Path so errors don't surface to the user as a cryptic "An unhandled fault has occurred."
+
+```
+Update Records (Opportunity)
+    ├── Normal path → continue flow
+    └── Fault path
+        ├── Assignment: errorMessage = $Flow.FaultMessage
+        ├── Action: Send custom error email to admin
+        └── End
+```
+
+Read `$Flow.FaultMessage` inside the fault path to capture the actual error.
+
+---
+
+## $Record vs $Record__Prior
+
+In update-triggered flows, you can compare the new and old values:
+
+```
+Decision: Did StageName change to 'Closed Won'?
+    Condition: $Record.StageName = 'Closed Won'
+           AND $Record__Prior.StageName != 'Closed Won'
+```
+
+Use `$Record__Prior` for "field was X, now Y" patterns to avoid running the same logic every time the record is touched.
+
+For new records, `$Record__Prior` is null — guard with a "Run flow when: A record is updated" entry condition or check `IsNew()` style logic.
+
+---
+
+## Subflows
+
+Move reusable logic into autolaunched flows and call them from other flows. Keeps individual flows readable and makes logic testable.
+
+```
+Parent flow:
+    Subflow: Calculate_Tax
+        Input: amount = $Record.Amount, region = $Record.BillingCountry
+        Output: taxAmount → set on $Record.Tax__c
+```
+
+Subflow inputs/outputs are declared in the called flow's Start element under "Manage Variables → Available for input/output."
+
+---
+
+## Get Records Patterns
+
+### Filter what you need
+
+```
+❌ Get Records: All Accounts → Loop → check Industry in flow
+✅ Get Records: Accounts WHERE Industry = 'Technology' AND IsActive__c = TRUE
+```
+
+### Cap the result size
+
+Add a "Sort and limit number of records returned" of N records, or use a tight WHERE clause. Each Get Records can return up to 50,000 rows but counts against the per-transaction 50,000 SOQL row limit.
+
+### Store only fields you use
+
+In Get Records → "How to store record data" → choose specific fields. Reduces heap and improves performance.
+
+---
+
+## Custom Metadata over Hardcoded Values
+
+```
+❌ Decision: Discount > 0.20 → Manager approval
+✅ Decision: Discount > {!$CustomMetadata.Approval_Settings__mdt.Default.Max_Discount__c}
+```
+
+Custom Metadata Type queries don't count against SOQL governor limits. Use them for:
+- Threshold values (max discount, late fee)
+- Email recipients per region
+- Feature flags
+- API endpoints / configuration
+
+---
+
+## Don't Mix Flow and Apex on the Same Operation
+
+If a record is updated by both an Apex trigger and a record-triggered flow, **execution order is not guaranteed in all cases**. Pick one tool per object per operation. Document the choice in the flow description or trigger comment.
+
+Order of execution (relevant portions):
+1. System validation rules
+2. Before-save flows (record-triggered)
+3. Before triggers (Apex)
+4. Custom validation rules
+5. After triggers (Apex)
+6. Assignment rules → auto-response → workflow rules (legacy)
+7. After-save flows (record-triggered)
+8. Async paths and time-based actions
+
+---
+
+## When to Use Flow vs Apex
+
+| Use Flow when | Use Apex when |
+|---|---|
+| Logic is declarative and a non-dev needs to read/maintain it | Logic is algorithmic (loops with complex conditions, math) |
+| Same-record field updates (before-save) | Recursive operations across object hierarchies |
+| Simple cross-object updates | Complex SOQL (aggregates, polymorphic, dynamic queries) |
+| Scheduled batch under 200 records per batch | Bulk processing > 10,000 records (Batch Apex) |
+| Calling REST endpoints via HTTP Callout Action | Custom REST/SOAP integrations |
+| Approval logic, branching workflows | Trigger frameworks, custom exception handling |
+
+Rule of thumb: **start in Flow, escalate to Apex when Flow becomes brittle or unreadable.**
+
+---
+
+## Schedule-Triggered Flow vs Scheduled Path
+
+**Schedule-Triggered Flow** — runs on a schedule (daily/weekly) against a filtered set of records. Replaces Schedulable Apex for record-iteration jobs.
+
+```
+Trigger: Daily at 2:00 AM
+Run for: Account where Health_Score__c < 50 AND LastModifiedDate < LAST_N_DAYS:30
+Action: Send "we miss you" email, create follow-up Task
+```
+
+Limits: max 200 records per execution per scheduled time. For higher volume, use Batch Apex.
+
+**Scheduled Path** (inside Record-Triggered Flow) — runs an action N hours/days **after** a record event.
+
+```
+Trigger: After Opportunity is created
+Path: 7 days after CreatedDate
+Action: If StageName still = 'Prospecting', send nudge email
+```
+
+Use Scheduled Paths instead of Time-Dependent Workflow Actions (Workflow Rules are retired).
+
+---
+
+## Screen Flows — Reactive Components (Spring '24+)
+
+Screen components react to changes in other components on the same screen without a Next-button reload.
+
+```
+Screen "Quote Builder":
+    Component A: Number input "Quantity"
+    Component B: Number input "Unit Price"
+    Component C: Display Text — value: {!Quantity} × {!UnitPrice} = {!Quantity * UnitPrice}
+```
+
+Component C re-renders as Quantity/UnitPrice change. Available on Lightning App and Experience Builder pages.
+
+---
+
+## HTTP Callout Actions (Spring '23+)
+
+Call REST APIs without writing Apex. Define a Named Credential + External Service or use the HTTP Callout action directly.
+
+```
+Action: HTTP Callout
+Named Credential: Stripe_API
+Method: POST
+Endpoint: /v1/charges
+Request body: { amount: {!$Record.Amount}, currency: 'usd', source: {!stripeToken} }
+Response: Stripe_Charge_Response (typed via JSON sample)
+```
+
+Use HTTP Callouts for simple integrations. Drop to Apex when you need OAuth flows, retries with backoff, or complex error mapping.
+
+---
+
+## Naming and Documentation
+
+| Element type | Naming convention |
+|---|---|
+| Flow API name | `<Object>_<Trigger>_<Purpose>` — e.g., `Opportunity_AfterUpdate_SyncCommission` |
+| Variable | camelCase — `accountToUpdate`, `errorMessages` |
+| Decision outcome | Sentence describing the condition — `Is Closed Won` |
+| Get Records element | `Get_<Object>_<Filter>` — `Get_Contacts_ByAccount` |
+| Update Records element | `Update_<Object>_<Field>` — `Update_Account_Status` |
+
+Always fill the **Description** field on the flow and on each element. Future-you and your teammates will thank you.
+
+---
+
+## Testing and Debug
+
+- **Debug runs** — built-in. Provide sample record IDs and see element-by-element execution.
+- **Flow Tests** (GA Winter '23) — declarative test cases stored with the flow. Cover positive paths, negative paths, and edge cases.
+- **Salesforce DevOps Center** — version control and deployment for flows.
+
+---
+
+## Migrating Off Legacy Tools
+
+### Process Builder
+
+Process Builder was **retired in August 2025**. Existing processes still run, but no new ones can be created. Migrate using **Setup → Migrate to Flow**.
+
+### Workflow Rules
+
+Workflow Rules were **deprecated for new use in Winter '23** and are scheduled for end-of-life. Migrate using the same tool. Field updates → before-save flow; email alerts and outbound messages → after-save flow.
+
+### Time-Dependent Workflow Actions
+
+Convert to **Scheduled Paths** in a Record-Triggered Flow.
+
+---
+
+## Common AI-Generated Mistakes
+
+| Mistake | Fix |
+|---|---|
+| Creating new Process Builder processes or Workflow Rules | Both are retired/deprecated. Use Record-Triggered Flow. |
+| Suggesting "Workflow Rule" for field updates | Use a before-save Record-Triggered Flow. |
+| DML inside a loop | Build a collection in the loop, DML once outside. |
+| Missing fault paths on Create/Update/Delete | Add a fault path; capture `$Flow.FaultMessage`. |
+| Hardcoded values in Decision conditions | Use Custom Metadata Type records. |
+| After-save flow for same-record field updates | Use before-save (Fast Field Updates) — 10× faster, no extra DML. |
+| Suggesting `if:true` / `if:false` syntax for Screen flows | Screen flows use Visibility rules, not LWC directives. |
+| Get Records returning every field | Specify only the fields used downstream. |
+| Logic split between Apex trigger AND record-triggered flow on the same object | Pick one. Document the choice. |
+| Approval Process for new approval workflows | Build approvals with Flow + custom status fields, or use the modern Approvals in Flow feature. |

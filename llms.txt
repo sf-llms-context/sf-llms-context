@@ -11,6 +11,9 @@
 ## Best Practices
 
 - [Apex Best Practices](patterns/apex-best-practices.md): Current Apex patterns — triggers, bulkification, async, testing, security
+- [SOQL Best Practices](patterns/soql-best-practices.md): Selective filters, bind variables, User Mode, relationship queries, cursors
+- [LWC Best Practices](patterns/lwc-best-practices.md): Lightning Data Service, lwc:if, lwc:ref, custom events, LMS, GraphQL
+- [Flow Best Practices](patterns/flow-best-practices.md): Record-Triggered Flow patterns, before-save vs after-save, fault paths, subflows
 
 ## Full Context
 

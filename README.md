@@ -50,10 +50,13 @@ npx @sf-llms/context
 |---|---|
 | `patterns/deprecated.md` | What AI must NOT generate — deprecated patterns with correct alternatives |
 | `patterns/apex-best-practices.md` | Current Apex patterns and idioms |
+| `patterns/soql-best-practices.md` | Selective queries, bind variables, User Mode, cursors |
+| `patterns/lwc-best-practices.md` | Lightning Data Service, lwc:if/ref, custom events, LMS, GraphQL |
+| `patterns/flow-best-practices.md` | Record-Triggered Flow patterns, fault paths, subflows |
 | `limits/governor-limits.md` | Current governor limit numbers (Summer '26 / v67.0) |
-| `api/rest-api.md` | REST API patterns *(Phase 2)* |
-| `api/bulk-api.md` | Bulk API 2.0 patterns *(Phase 2)* |
-| `releases/current.md` | Latest release summary *(Phase 2)* |
+| `api/rest-api.md` | REST API patterns *(Phase 3)* |
+| `api/bulk-api.md` | Bulk API 2.0 patterns *(Phase 3)* |
+| `releases/current.md` | Latest release summary *(Phase 3)* |
 
 ## Current Salesforce version
 
