@@ -1,0 +1,17 @@
+# sf-llms-context
+
+> Curated Salesforce knowledge for AI coding agents. Prevents LLMs from generating deprecated patterns.
+> Current: Summer '25 | API v64.0
+
+## Core — Read These First
+
+- [Deprecated Patterns](patterns/deprecated.md): What AI must NOT generate — deprecated Salesforce patterns with correct alternatives
+- [Governor Limits](limits/governor-limits.md): Current governor limit numbers — reference before generating any Apex code
+
+## Best Practices
+
+- [Apex Best Practices](patterns/apex-best-practices.md): Current Apex patterns — triggers, bulkification, async, testing, security
+
+## Full Context
+
+- [Complete Reference](llms-full.txt): All content concatenated in priority order — single fetch for full context

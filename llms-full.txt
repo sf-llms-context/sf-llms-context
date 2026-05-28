@@ -1,0 +1,992 @@
+# Deprecated Salesforce Patterns — Do NOT Generate These
+
+> AI: Read this file FIRST before generating any Salesforce code. Every pattern here is wrong. Use the GOOD alternative instead.
+> Release: Summer '25 | API: v64.0 | Updated: 2025-06
+
+---
+
+## Apex
+
+### SOQL in loops
+
+- BAD:
+```apex
+for (Account acc : accounts) {
+    List<Contact> contacts = [SELECT Id FROM Contact WHERE AccountId = :acc.Id];
+}
+```
+- GOOD:
+```apex
+Map<Id, List<Contact>> contactsByAccount = new Map<Id, List<Contact>>();
+for (Contact c : [SELECT Id, AccountId FROM Contact WHERE AccountId IN :accountIds]) {
+    if (!contactsByAccount.containsKey(c.AccountId)) {
+        contactsByAccount.put(c.AccountId, new List<Contact>());
+    }
+    contactsByAccount.get(c.AccountId).add(c);
+}
+```
+- WHY: Governor limit — 100 SOQL queries per transaction. Loops hit this instantly with bulk data.
+
+### DML without error handling
+
+- BAD:
+```apex
+insert contacts;
+```
+- GOOD:
+```apex
+List<Database.SaveResult> results = Database.insert(contacts, false);
+for (Database.SaveResult sr : results) {
+    if (!sr.isSuccess()) {
+        for (Database.Error err : sr.getErrors()) {
+            System.debug(LoggingLevel.ERROR, err.getStatusCode() + ': ' + err.getMessage());
+        }
+    }
+}
+```
+- WHY: Partial success handling. `insert` throws on first failure, losing all remaining records.
+
+### Business logic in triggers
+
+- BAD:
+```apex
+trigger AccountTrigger on Account (before insert, before update) {
+    for (Account acc : Trigger.new) {
+        if (acc.Industry == 'Technology') {
+            acc.Rating = 'Hot';
+        }
+    }
+}
+```
+- GOOD:
+```apex
+trigger AccountTrigger on Account (before insert, before update, after insert, after update) {
+    AccountTriggerHandler.run(Trigger.operationType, Trigger.new, Trigger.oldMap);
+}
+```
+```apex
+public class AccountTriggerHandler {
+    public static void run(System.TriggerOperation operation, List<Account> newList, Map<Id, Account> oldMap) {
+        switch on operation {
+            when BEFORE_INSERT, BEFORE_UPDATE {
+                setRatingForTechAccounts(newList);
+            }
+        }
+    }
+
+    private static void setRatingForTechAccounts(List<Account> accounts) {
+        for (Account acc : accounts) {
+            if (acc.Industry == 'Technology') {
+                acc.Rating = 'Hot';
+            }
+        }
+    }
+}
+```
+- WHY: One trigger per object. Logic in handler classes for testability and maintainability.
+
+### Hardcoded Record Type IDs
+
+- BAD:
+```apex
+acc.RecordTypeId = '012000000000001';
+```
+- GOOD:
+```apex
+acc.RecordTypeId = Schema.SObjectType.Account.getRecordTypeInfosByDeveloperName()
+    .get('Enterprise').getRecordTypeId();
+```
+- WHY: IDs differ between orgs and sandboxes. Hardcoded IDs break on deploy.
+
+### Hardcoded IDs
+
+- BAD:
+```apex
+Id priceBookId = '01s000000000001';
+```
+- GOOD:
+```apex
+Id priceBookId = [SELECT Id FROM Pricebook2 WHERE IsStandard = true LIMIT 1].Id;
+// Or use Custom Metadata Types for configurable IDs
+MyConfig__mdt config = MyConfig__mdt.getInstance('Default');
+Id priceBookId = config.PriceBookId__c;
+```
+- WHY: IDs are org-specific. Use queries, Custom Metadata Types, or Custom Labels.
+
+### Without sharing by default
+
+- BAD:
+```apex
+public class AccountService {
+    public List<Account> getAccounts() {
+        return [SELECT Id, Name FROM Account];
+    }
+}
+```
+- GOOD:
+```apex
+public with sharing class AccountService {
+    public List<Account> getAccounts() {
+        return [SELECT Id, Name FROM Account];
+    }
+}
+```
+- WHY: `without sharing` bypasses record-level security. Default to `with sharing`. Use `without sharing` only when explicitly needed (e.g., system-level operations).
+
+### String concatenation in SOQL
+
+- BAD:
+```apex
+String query = 'SELECT Id FROM Account WHERE Name = \'' + userInput + '\'';
+List<Account> accounts = Database.query(query);
+```
+- GOOD:
+```apex
+String query = 'SELECT Id FROM Account WHERE Name = :userInput';
+List<Account> accounts = Database.query(query);
+```
+- WHY: SOQL injection vulnerability. Always use bind variables.
+
+### Tests without bulk data
+
+- BAD:
+```apex
+@isTest
+static void testInsert() {
+    Account acc = new Account(Name = 'Test');
+    insert acc;
+    System.assertNotEquals(null, acc.Id);
+}
+```
+- GOOD:
+```apex
+@isTest
+static void testInsertBulk() {
+    List<Account> accounts = new List<Account>();
+    for (Integer i = 0; i < 200; i++) {
+        accounts.add(new Account(Name = 'Test ' + i));
+    }
+    insert accounts;
+    System.assertEquals(200, [SELECT COUNT() FROM Account]);
+}
+```
+- WHY: Triggers and automation fire on bulk operations. Testing with 1 record hides governor limit issues.
+
+### @future for complex async
+
+- BAD:
+```apex
+@future
+public static void processRecords(Set<Id> recordIds) {
+    // Can't chain, can't monitor, limited parameters
+}
+```
+- GOOD:
+```apex
+public class RecordProcessor implements Queueable {
+    private List<Id> recordIds;
+
+    public RecordProcessor(List<Id> recordIds) {
+        this.recordIds = recordIds;
+    }
+
+    public void execute(QueueableContext context) {
+        // Can chain, can pass complex objects, can monitor via AsyncApexJob
+    }
+}
+```
+- WHY: Queueable supports chaining, complex parameters, and job monitoring. `@future` is fire-and-forget only.
+
+### Workflow Rules
+
+- BAD: Creating or referencing Workflow Rules for field updates, email alerts, or outbound messages.
+- GOOD: Use Flow Builder (Record-Triggered Flows) for all automation.
+- WHY: Workflow Rules deprecated since Spring '23. Salesforce will remove them. Migrate existing ones with the Migrate to Flow tool.
+
+### Process Builder
+
+- BAD: Creating or referencing Process Builder for any automation.
+- GOOD: Use Flow Builder (Record-Triggered Flows) for all automation.
+- WHY: Process Builder deprecated since Spring '23. Cannot be created in new orgs. Migrate existing ones with the Migrate to Flow tool.
+
+---
+
+## LWC
+
+### Aura components for new development
+
+- BAD:
+```html
+<aura:component>
+    <aura:attribute name="greeting" type="String" default="Hello"/>
+    <p>{!v.greeting}</p>
+</aura:component>
+```
+- GOOD:
+```html
+<template>
+    <p>{greeting}</p>
+</template>
+```
+```javascript
+import { LightningElement } from 'lwc';
+export default class MyComponent extends LightningElement {
+    greeting = 'Hello';
+}
+```
+- WHY: Aura is in maintenance mode. LWC is faster, uses web standards, and is the only actively developed component framework.
+
+### Template expressions with JS logic
+
+- BAD:
+```html
+<template>
+    <p>{count + 1}</p>
+    <p>{items.length > 0 ? 'Has items' : 'Empty'}</p>
+</template>
+```
+- GOOD:
+```html
+<template>
+    <p>{nextCount}</p>
+    <template lwc:if={hasItems}>
+        <p>Has items</p>
+    </template>
+</template>
+```
+```javascript
+get nextCount() {
+    return this.count + 1;
+}
+get hasItems() {
+    return this.items.length > 0;
+}
+```
+- WHY: LWC templates don't support JavaScript expressions. Use getter properties in the JS class.
+
+### Direct DOM manipulation
+
+- BAD:
+```javascript
+this.template.querySelector('.counter').textContent = this.count;
+```
+- GOOD:
+```javascript
+// Use reactive properties — the template re-renders automatically
+this.count = newValue;
+```
+- WHY: LWC uses a reactive rendering model. Direct DOM manipulation bypasses it and causes state inconsistencies.
+
+### Imperative Apex without error handling
+
+- BAD:
+```javascript
+import getAccounts from '@salesforce/apex/AccountController.getAccounts';
+
+async connectedCallback() {
+    this.accounts = await getAccounts();
+}
+```
+- GOOD:
+```javascript
+import getAccounts from '@salesforce/apex/AccountController.getAccounts';
+
+async connectedCallback() {
+    try {
+        this.accounts = await getAccounts();
+    } catch (error) {
+        this.dispatchEvent(
+            new ShowToastEvent({ title: 'Error', message: error.body.message, variant: 'error' })
+        );
+    }
+}
+```
+- WHY: Apex calls fail (permissions, governor limits, network). Unhandled errors leave the component in a broken state.
+
+### Deprecated template directives
+
+- BAD:
+```html
+<template if:true={isVisible}>
+    <p>Visible</p>
+</template>
+<template for:each={items} for:item="item">
+    <p key={item.id}>{item.name}</p>
+</template>
+```
+- GOOD:
+```html
+<template lwc:if={isVisible}>
+    <p>Visible</p>
+</template>
+<template for:each={items} for:item="item">
+    <p key={item.id}>{item.name}</p>
+</template>
+```
+- WHY: `if:true` and `if:false` are deprecated since Spring '23. Use `lwc:if`, `lwc:elseif`, `lwc:else`.
+
+---
+
+## SOQL
+
+### SELECT * (doesn't exist)
+
+- BAD:
+```sql
+SELECT * FROM Account
+```
+- GOOD:
+```sql
+SELECT Id, Name, Industry, Rating FROM Account
+```
+- WHY: SOQL has no `SELECT *`. AI models hallucinate this. Always list fields explicitly.
+
+### Queries without LIMIT
+
+- BAD:
+```sql
+SELECT Id, Name FROM Account WHERE Industry = 'Technology'
+```
+- GOOD:
+```sql
+SELECT Id, Name FROM Account WHERE Industry = 'Technology' LIMIT 200
+```
+- WHY: Governor limit — 50,000 rows per transaction. Unbounded queries risk hitting this in production.
+
+### Nested subqueries beyond 1 level
+
+- BAD:
+```sql
+SELECT Id, (SELECT Id, (SELECT Id FROM Tasks) FROM Contacts) FROM Account
+```
+- GOOD:
+```sql
+// Query 1: Accounts with Contacts
+SELECT Id, (SELECT Id FROM Contacts) FROM Account
+// Query 2: Tasks for those contacts
+SELECT Id, WhoId FROM Task WHERE WhoId IN :contactIds
+```
+- WHY: SOQL doesn't support nested subqueries beyond one level. This will throw a runtime error.
+
+### COUNT() with other fields
+
+- BAD:
+```sql
+SELECT Name, COUNT() FROM Account GROUP BY Name
+```
+- GOOD:
+```sql
+SELECT Name, COUNT(Id) cnt FROM Account GROUP BY Name
+```
+- WHY: `COUNT()` can't be mixed with other fields. Use `COUNT(fieldName)` with an alias in aggregate queries.
+
+### Queries in loops
+
+- BAD:
+```apex
+for (Account acc : accounts) {
+    acc.Primary_Contact__c = [SELECT Id FROM Contact WHERE AccountId = :acc.Id LIMIT 1].Id;
+}
+```
+- GOOD:
+```apex
+Map<Id, Contact> primaryContacts = new Map<Id, Contact>();
+for (Contact c : [SELECT Id, AccountId FROM Contact WHERE AccountId IN :accountIds ORDER BY CreatedDate DESC]) {
+    if (!primaryContacts.containsKey(c.AccountId)) {
+        primaryContacts.put(c.AccountId, c);
+    }
+}
+for (Account acc : accounts) {
+    Contact primary = primaryContacts.get(acc.Id);
+    if (primary != null) {
+        acc.Primary_Contact__c = primary.Id;
+    }
+}
+```
+- WHY: Same as SOQL-in-loops above. Query once, filter in memory.
+
+---
+
+## Flow
+
+### BEFORE + AFTER in one Record-Triggered Flow
+
+- BAD: A single Record-Triggered Flow that runs in both Before Save and After Save context.
+- GOOD: Create two separate Record-Triggered Flows — one for Before Save, one for After Save.
+- WHY: Since Spring '24, combining BEFORE and AFTER in one flow causes unexpected order-of-execution issues. Salesforce recommends separating them.
+
+### Get Records inside loops
+
+- BAD: A Loop element containing a Get Records element.
+- GOOD: Use Get Records before the Loop. Use a Collection Filter or Assignment to process data inside the loop.
+- WHY: Each Get Records inside a loop counts against the SOQL governor limit. Same principle as SOQL-in-loops in Apex.
+
+### No fault paths
+
+- BAD: Flow with DML or callout elements but no Fault connectors.
+- GOOD: Add Fault connectors on every Create/Update/Delete/Callout element. Route to a Screen or Platform Event that logs the error.
+- WHY: Flows fail silently in production without fault paths. Users see a generic error page with no actionable information.
+
+### Auto-Launched Flows for record triggers
+
+- BAD: Creating an Auto-Launched Flow and wiring it via Process Builder or Workflow Rule.
+- GOOD: Use Record-Triggered Flows directly.
+- WHY: Process Builder and Workflow Rules are deprecated. Record-Triggered Flows are the native replacement with better performance and debugging.
+
+---
+
+## API
+
+### Outdated API versions
+
+- BAD: Using API version below v55.0 in any new code, metadata, or integration.
+- GOOD: Use API version v64.0 (Summer '25) for all new work.
+- WHY: Old API versions miss security fixes, new features, and bug fixes. Salesforce retires old versions periodically.
+
+### SOAP API for new integrations
+
+- BAD: Using SOAP API (enterprise.wsdl / partner.wsdl) for new integrations.
+- GOOD: Use REST API for real-time operations. Use Bulk API 2.0 for data loading (>2,000 records).
+- WHY: SOAP API is legacy. REST API is simpler, supports JSON, and has better tooling support.
+
+### Bulk API 1.0
+
+- BAD: Using Bulk API 1.0 (XML batches, `/job` endpoint).
+- GOOD: Use Bulk API 2.0 (`/jobs/ingest` endpoint, CSV upload).
+- WHY: Bulk API 2.0 is simpler (no batch management), supports CSV natively, and handles retry automatically.
+
+### Composite API without limits awareness
+
+- BAD: Sending >25 subrequests in a single Composite API call without checking limits.
+- GOOD: Batch subrequests into groups of 25. Use `allOrNone` parameter for transaction control.
+- WHY: Composite API maximum is 25 subrequests per call. Exceeding this returns an error.
+
+---
+
+## General Tooling
+
+### Metadata API for simple deployments
+
+- BAD: Using Metadata API directly or Ant Migration Tool for deployments.
+- GOOD: Use Salesforce CLI: `sf project deploy start --source-dir force-app`
+- WHY: Ant Migration Tool is deprecated. Salesforce CLI (sf) is the current standard for all deployments.
+
+### Force.com IDE
+
+- BAD: Using Force.com IDE, MavensMate, or Illuminated Cloud 1.
+- GOOD: Use VS Code + Salesforce Extension Pack.
+- WHY: Force.com IDE discontinued in 2018. VS Code is the only officially supported IDE for Salesforce development.
+
+### Classic UI development
+
+- BAD: Building Visualforce pages, JavaScript buttons, or S-Controls for new functionality.
+- GOOD: Build with LWC (Lightning Web Components). Use Visualforce only for edge cases not yet supported in Lightning.
+- WHY: Salesforce Classic is in maintenance mode. Lightning Experience is the standard UI platform.
+# Salesforce Governor Limits — Current Numbers
+
+> AI: Reference these numbers when generating Apex code. Never hardcode values that exceed these limits. When in doubt, add LIMIT clauses and bulkify.
+> Release: Summer '25 | API: v64.0 | Updated: 2025-06
+
+---
+
+## Apex Per-Transaction Limits (Synchronous)
+
+| Limit | Value |
+|---|---|
+| SOQL queries | 100 |
+| SOQL rows retrieved | 50,000 |
+| SOSL queries | 20 |
+| SOSL rows retrieved | 2,000 |
+| DML statements | 150 |
+| DML rows | 10,000 |
+| Heap size | 6 MB |
+| CPU time | 10,000 ms |
+| Callouts (HTTP/Web Service) | 100 |
+| Callout timeout (total) | 120,000 ms |
+| Single callout timeout | 120,000 ms |
+| Future calls | 50 |
+| Queueable jobs enqueued | 50 |
+| Batch Apex jobs queued/active | 5 |
+| Email invocations (single) | 10 |
+| Email invocations (mass) | 10 |
+| Push notifications | 10 |
+| EventBus.publish calls | 150 |
+| Describes | 100 |
+| SOQL query locator rows | 10,000 |
+
+## Apex Per-Transaction Limits (Asynchronous)
+
+Async methods (Batch, Queueable, Future, Scheduled) get higher limits:
+
+| Limit | Value |
+|---|---|
+| SOQL queries | 200 |
+| Heap size | 12 MB |
+| CPU time | 60,000 ms |
+
+All other limits remain the same as synchronous.
+
+## Batch Apex Limits
+
+| Limit | Value |
+|---|---|
+| Max batch size (scope) | 2,000 |
+| Default batch size | 200 |
+| QueryLocator rows | 50,000,000 |
+| Concurrent batch jobs | 5 |
+| Flex queue max | 100 |
+| execute re-tries on failure | 0 |
+
+## Platform Events
+
+| Limit | Value |
+|---|---|
+| Publish calls per transaction | 150 |
+| EventBus.publish per call | 1 event (list overload allows multiple) |
+| High-volume event delivery | Up to 100,000/hour (varies by edition) |
+| Standard-volume daily limit | Varies by edition |
+| CometD subscribers | Varies by edition |
+| Event retention | 72 hours (high-volume) |
+
+## Bulk API 2.0
+
+| Limit | Value |
+|---|---|
+| Max file size per upload | 150 MB |
+| Max records per batch | 10,000 |
+| Max batches per job | 15,000 |
+| Max fields per record | 5,000 |
+| Concurrent jobs (query) | 5 |
+| Concurrent jobs (ingest) | 7 (Enterprise), varies by edition |
+
+## REST API
+
+| Limit | Value |
+|---|---|
+| API calls per 24h | Varies by edition (org-level) |
+| Composite subrequests | 25 per call |
+| Composite Graph subrequests | 500 per call |
+| SObject Tree max records | 200 |
+| Request body size | 50 MB |
+
+## Flows
+
+| Limit | Value |
+|---|---|
+| Interviews per transaction | 2,000 |
+| Elements executed per interview | 2,000 |
+| SOQL queries | Same as Apex (100/200) |
+| DML statements | Same as Apex (150) |
+| Scheduled paths per flow | 10 |
+| Scheduled path time range | Up to 6 months |
+
+## Data Storage
+
+| Limit | Value |
+|---|---|
+| Record storage | Varies by edition + per-user allocation |
+| File storage | Varies by edition + per-user allocation |
+| Max records returned by report | 2,000 (UI), 2,000 (API) |
+| Max report filters | 20 |
+| Big Object max rows per insert | 100 |
+
+## Commonly Hit Limits
+
+These are the limits AI-generated code violates most frequently:
+
+1. **SOQL 100 query limit** — #1 cause of production failures. Always bulkify.
+2. **DML 150 statement limit** — Don't DML inside loops.
+3. **CPU 10s limit** — Watch nested loops and complex string operations.
+4. **50,000 row limit** — Always add WHERE clauses and LIMIT.
+5. **Heap 6MB limit** — Don't load large datasets into memory. Use Batch Apex for large volumes.
+# Apex Best Practices — Current Patterns
+
+> AI: Use these patterns when generating Apex code. These are the current recommended approaches for Summer '25.
+> Release: Summer '25 | API: v64.0 | Updated: 2025-06
+
+---
+
+## Trigger Framework
+
+### One trigger per object, logic in handler class
+
+```apex
+trigger OpportunityTrigger on Opportunity (
+    before insert, before update, before delete,
+    after insert, after update, after delete, after undelete
+) {
+    OpportunityTriggerHandler.run(Trigger.operationType, Trigger.new, Trigger.old, Trigger.newMap, Trigger.oldMap);
+}
+```
+
+```apex
+public with sharing class OpportunityTriggerHandler {
+    public static void run(
+        System.TriggerOperation operation,
+        List<Opportunity> newList,
+        List<Opportunity> oldList,
+        Map<Id, Opportunity> newMap,
+        Map<Id, Opportunity> oldMap
+    ) {
+        switch on operation {
+            when BEFORE_INSERT {
+                setDefaults(newList);
+            }
+            when AFTER_INSERT {
+                createRelatedRecords(newList);
+            }
+            when BEFORE_UPDATE {
+                validateChanges(newList, oldMap);
+            }
+            when AFTER_UPDATE {
+                syncExternalSystem(newList, oldMap);
+            }
+        }
+    }
+
+    private static void setDefaults(List<Opportunity> opps) { /* ... */ }
+    private static void createRelatedRecords(List<Opportunity> opps) { /* ... */ }
+    private static void validateChanges(List<Opportunity> opps, Map<Id, Opportunity> oldMap) { /* ... */ }
+    private static void syncExternalSystem(List<Opportunity> opps, Map<Id, Opportunity> oldMap) { /* ... */ }
+}
+```
+
+---
+
+## Bulkification
+
+### Use Maps for record lookups
+
+```apex
+Map<Id, Account> accountMap = new Map<Id, Account>(
+    [SELECT Id, Name, Industry FROM Account WHERE Id IN :accountIds]
+);
+
+for (Contact c : contacts) {
+    Account acc = accountMap.get(c.AccountId);
+    if (acc != null && acc.Industry == 'Technology') {
+        c.Tech_Account__c = true;
+    }
+}
+```
+
+### Use Sets for ID collections
+
+```apex
+Set<Id> accountIds = new Set<Id>();
+for (Contact c : Trigger.new) {
+    accountIds.add(c.AccountId);
+}
+// One query for all contacts
+List<Account> accounts = [SELECT Id, Name FROM Account WHERE Id IN :accountIds];
+```
+
+### Collect DML into lists
+
+```apex
+List<Task> tasksToInsert = new List<Task>();
+for (Opportunity opp : opportunities) {
+    tasksToInsert.add(new Task(
+        WhatId = opp.Id,
+        Subject = 'Follow up',
+        ActivityDate = Date.today().addDays(7)
+    ));
+}
+insert tasksToInsert;
+```
+
+---
+
+## Database Methods vs DML Statements
+
+### Use Database methods for partial success
+
+```apex
+List<Database.SaveResult> results = Database.insert(records, false);
+for (Database.SaveResult sr : results) {
+    if (!sr.isSuccess()) {
+        for (Database.Error err : sr.getErrors()) {
+            System.debug(LoggingLevel.ERROR, err.getStatusCode() + ': ' + err.getMessage());
+        }
+    }
+}
+```
+
+### Use DML statements when all-or-nothing is required
+
+```apex
+Savepoint sp = Database.setSavepoint();
+try {
+    insert parentRecord;
+    insert childRecords;
+} catch (DmlException e) {
+    Database.rollback(sp);
+    throw e;
+}
+```
+
+---
+
+## Async Patterns
+
+### Queueable — default choice for async
+
+```apex
+public class DataSyncJob implements Queueable, Database.AllowsCallouts {
+    private List<Id> recordIds;
+
+    public DataSyncJob(List<Id> recordIds) {
+        this.recordIds = recordIds;
+    }
+
+    public void execute(QueueableContext context) {
+        List<Account> accounts = [SELECT Id, Name FROM Account WHERE Id IN :recordIds];
+        // Process and optionally chain
+        if (!remainingIds.isEmpty()) {
+            System.enqueueJob(new DataSyncJob(remainingIds));
+        }
+    }
+}
+// Enqueue
+System.enqueueJob(new DataSyncJob(recordIds));
+```
+
+### Batch — for processing large data volumes (>50k records)
+
+```apex
+public class AccountCleanupBatch implements Database.Batchable<SObject> {
+    public Database.QueryLocator start(Database.BatchableContext bc) {
+        return Database.getQueryLocator('SELECT Id, Name FROM Account WHERE IsCleanedUp__c = false');
+    }
+
+    public void execute(Database.BatchableContext bc, List<Account> scope) {
+        for (Account acc : scope) {
+            acc.IsCleanedUp__c = true;
+        }
+        update scope;
+    }
+
+    public void finish(Database.BatchableContext bc) {
+        System.debug('Batch complete');
+    }
+}
+// Execute with batch size of 200
+Database.executeBatch(new AccountCleanupBatch(), 200);
+```
+
+### Schedulable — for recurring jobs
+
+```apex
+public class WeeklyReportScheduler implements Schedulable {
+    public void execute(SchedulableContext sc) {
+        Database.executeBatch(new WeeklyReportBatch(), 200);
+    }
+}
+// Schedule: every Monday at 6 AM
+System.schedule('Weekly Report', '0 0 6 ? * MON', new WeeklyReportScheduler());
+```
+
+### When to use which
+
+| Pattern | Use when |
+|---|---|
+| Queueable | Default async. Supports chaining, complex params, callouts |
+| Batch | Processing >50k records. QueryLocator supports 50M rows |
+| Schedulable | Recurring jobs on a cron schedule |
+| @future | Simple fire-and-forget with primitive params only (avoid for new code) |
+| Platform Events | Cross-boundary async, guaranteed delivery, event-driven architecture |
+
+---
+
+## Test Patterns
+
+### TestDataFactory
+
+```apex
+@isTest
+public class TestDataFactory {
+    public static List<Account> createAccounts(Integer count) {
+        List<Account> accounts = new List<Account>();
+        for (Integer i = 0; i < count; i++) {
+            accounts.add(new Account(Name = 'Test Account ' + i));
+        }
+        insert accounts;
+        return accounts;
+    }
+
+    public static List<Contact> createContacts(List<Account> accounts, Integer perAccount) {
+        List<Contact> contacts = new List<Contact>();
+        for (Account acc : accounts) {
+            for (Integer i = 0; i < perAccount; i++) {
+                contacts.add(new Contact(
+                    FirstName = 'Test',
+                    LastName = 'Contact ' + i,
+                    AccountId = acc.Id
+                ));
+            }
+        }
+        insert contacts;
+        return contacts;
+    }
+}
+```
+
+### @TestSetup for shared test data
+
+```apex
+@isTest
+private class OpportunityServiceTest {
+    @TestSetup
+    static void setup() {
+        List<Account> accounts = TestDataFactory.createAccounts(5);
+        TestDataFactory.createContacts(accounts, 2);
+    }
+
+    @isTest
+    static void testBulkInsert() {
+        List<Account> accounts = [SELECT Id FROM Account];
+        List<Opportunity> opps = new List<Opportunity>();
+        for (Account acc : accounts) {
+            opps.add(new Opportunity(
+                AccountId = acc.Id,
+                Name = 'Test Opp',
+                StageName = 'Prospecting',
+                CloseDate = Date.today().addDays(30)
+            ));
+        }
+
+        Test.startTest();
+        insert opps;
+        Test.stopTest();
+
+        System.assertEquals(5, [SELECT COUNT() FROM Opportunity]);
+    }
+}
+```
+
+### Test.startTest() / Test.stopTest() resets governor limits
+
+Always wrap the method under test in `Test.startTest()` / `Test.stopTest()` to get a fresh set of governor limits and to force async jobs to complete synchronously.
+
+---
+
+## Security
+
+### WITH SECURITY_ENFORCED
+
+```apex
+List<Account> accounts = [
+    SELECT Id, Name, Phone
+    FROM Account
+    WHERE Industry = 'Technology'
+    WITH SECURITY_ENFORCED
+];
+```
+
+Throws `System.QueryException` if user lacks field/object access. Use for read operations where you want strict enforcement.
+
+### Security.stripInaccessible()
+
+```apex
+List<Account> accounts = [SELECT Id, Name, Phone, Revenue__c FROM Account];
+SObjectAccessDecision decision = Security.stripInaccessible(AccessType.READABLE, accounts);
+List<Account> sanitized = decision.getRecords();
+```
+
+Silently removes inaccessible fields instead of throwing. Use when you want graceful degradation.
+
+### User mode database operations (Spring '23+)
+
+```apex
+List<Account> accounts = [SELECT Id, Name FROM Account WITH USER_MODE];
+Database.insert(records, AccessLevel.USER_MODE);
+```
+
+Enforces CRUD, FLS, and sharing in a single declaration. Preferred for new code.
+
+---
+
+## Custom Metadata Types for Configuration
+
+```apex
+List<Integration_Setting__mdt> settings = Integration_Setting__mdt.getAll().values();
+Integration_Setting__mdt apiConfig = Integration_Setting__mdt.getInstance('PaymentGateway');
+String endpoint = apiConfig.Endpoint__c;
+String apiKey = apiConfig.API_Key__c;
+```
+
+Use Custom Metadata Types instead of Custom Settings (Legacy) or hardcoded values. They are deployable, packageable, and editable in production.
+
+---
+
+## Platform Events
+
+### Publishing
+
+```apex
+OrderEvent__e event = new OrderEvent__e(
+    OrderId__c = order.Id,
+    Action__c = 'CREATED'
+);
+Database.SaveResult sr = EventBus.publish(event);
+```
+
+### Subscribing (Apex trigger)
+
+```apex
+trigger OrderEventTrigger on OrderEvent__e (after insert) {
+    List<Task> tasks = new List<Task>();
+    for (OrderEvent__e event : Trigger.new) {
+        tasks.add(new Task(
+            Subject = 'Process Order: ' + event.OrderId__c,
+            Status = 'New'
+        ));
+    }
+    insert tasks;
+}
+```
+
+Use Platform Events for:
+- Cross-system async communication
+- Loosely coupled integrations
+- Event-driven architecture
+- Logging from triggers (commit-independent)
+
+---
+
+## Exception Handling
+
+```apex
+public with sharing class OrderService {
+    public class OrderServiceException extends Exception {}
+
+    public static Order__c createOrder(Id accountId, List<OrderItem> items) {
+        if (items == null || items.isEmpty()) {
+            throw new OrderServiceException('Order must have at least one item');
+        }
+
+        Savepoint sp = Database.setSavepoint();
+        try {
+            Order__c order = new Order__c(Account__c = accountId, Status__c = 'Draft');
+            insert order;
+
+            List<OrderLineItem__c> lineItems = new List<OrderLineItem__c>();
+            for (OrderItem item : items) {
+                lineItems.add(new OrderLineItem__c(
+                    Order__c = order.Id,
+                    Product__c = item.productId,
+                    Quantity__c = item.quantity
+                ));
+            }
+            insert lineItems;
+
+            return order;
+        } catch (DmlException e) {
+            Database.rollback(sp);
+            throw new OrderServiceException('Failed to create order: ' + e.getMessage());
+        }
+    }
+}
+```
+
+Custom exception classes for each service. Use Savepoints for multi-step DML. Catch specific exceptions, not generic `Exception`.
