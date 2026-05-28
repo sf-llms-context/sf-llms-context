@@ -93,6 +93,19 @@ Why this matters: even when a single transaction stays within per-transaction li
 
 Note: Standard Volume Platform Events are no longer supported starting Winter '27. Migrate to High Volume Platform Events.
 
+### Pub/Sub API
+
+| Limit | Value |
+|---|---|
+| Max event message size | 1 MB |
+| Max recommended batch in a PublishRequest | 3 MB (gRPC hard cap is 4 MB) |
+| Recommended events per publish request | ≤ 200 |
+| Max events per `FetchRequest` / `ManagedFetchRequest` | 100 |
+| Max managed subscriptions per org | 200 |
+| gRPC concurrent streams per channel | 1,000 (HTTP/2 underlying connection) |
+
+Note: Pub/Sub API is the recommended subscription channel for new integrations. CometD remains supported but is in maintenance mode.
+
 ## Bulk API 2.0
 
 | Limit | Value |
