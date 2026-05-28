@@ -197,6 +197,21 @@ System.schedule('Weekly Report', '0 0 6 ? * MON', new WeeklyReportScheduler());
 | @future | Simple fire-and-forget with primitive params only (avoid for new code) |
 | Platform Events | Cross-boundary async, guaranteed delivery, event-driven architecture |
 
+### Apex Cursors — flexible large dataset processing (GA, API v66.0+)
+
+```apex
+Database.Cursor cursor = Database.getCursor(
+    'SELECT Id, Name FROM Account WHERE Industry = \'Technology\''
+);
+Integer totalSize = cursor.getNumRecords();
+
+List<Account> chunk = (List<Account>) cursor.fetch(0, 200);
+
+List<Account> nextChunk = (List<Account>) cursor.fetch(200, 200);
+```
+
+Use cursors when you need flexible random-access to large result sets without Batch Apex overhead. Cursors can be serialized and passed between Queueable jobs. Each `fetch()` counts against the SOQL query limit and rows fetched count against the row limit.
+
 ---
 
 ## Test Patterns

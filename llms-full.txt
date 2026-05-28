@@ -223,6 +223,30 @@ public class RecordProcessor implements Queueable {
 ```
 - WHY: Queueable supports chaining, complex parameters, and job monitoring. `@future` is fire-and-forget only.
 
+### Abstract/override methods without access modifiers
+
+- BAD:
+```apex
+public virtual class BaseHandler {
+    virtual void handleRecord(SObject record) { }
+}
+
+public class ChildHandler extends BaseHandler {
+    override void handleRecord(SObject record) { }
+}
+```
+- GOOD:
+```apex
+public virtual class BaseHandler {
+    public virtual void handleRecord(SObject record) { }
+}
+
+public class ChildHandler extends BaseHandler {
+    public override void handleRecord(SObject record) { }
+}
+```
+- WHY: Since API v65.0 (Winter '26), `abstract` and `override` methods require an explicit access modifier (`protected`, `public`, or `global`). Omitting it causes a compilation error.
+
 ### String concatenation for multiline text
 
 - BAD:
@@ -372,6 +396,18 @@ async connectedCallback() {
 </template>
 ```
 - WHY: `if:true` and `if:false` are deprecated since Spring '23. Use `lwc:if`, `lwc:elseif`, `lwc:else`.
+
+### lightning/uiGraphQLApi module
+
+- BAD:
+```javascript
+import { gql, graphql } from 'lightning/uiGraphQLApi';
+```
+- GOOD:
+```javascript
+import { gql, graphql } from 'lightning/graphql';
+```
+- WHY: `lightning/graphql` supersedes `lightning/uiGraphQLApi` since Winter '26 (API v65.0). The new module supports optional fields (inaccessible fields are omitted instead of failing), dynamic queries with string interpolation, and mutations (GA in Spring '26).
 
 ---
 
@@ -552,7 +588,7 @@ for (Account acc : accounts) {
 
 > AI: Reference these numbers when generating Apex code. Never hardcode values that exceed these limits. When in doubt, add LIMIT clauses and bulkify.
 > Release: Summer '26 | API: v67.0 | Updated: 2026-06
-> Note: Governor limit numbers verified against Summer '26 release notes. No number changes from Summer '25.
+> Note: Governor limit numbers verified against Winter '26, Spring '26, and Summer '26 release notes — no number changes since Summer '25. Cursor-related limits added in Spring '26 (API v66.0).
 
 ---
 
@@ -580,6 +616,8 @@ for (Account acc : accounts) {
 | EventBus.publish calls | 150 |
 | Describes | 100 |
 | SOQL query locator rows | 10,000 |
+| Apex Cursor rows (per fetch) | counts against SOQL row limit |
+| Apex Cursors (per transaction) | tracked via Limits.getApexCursors() |
 
 ## Apex Per-Transaction Limits (Asynchronous)
 
@@ -868,6 +906,21 @@ System.schedule('Weekly Report', '0 0 6 ? * MON', new WeeklyReportScheduler());
 | Schedulable | Recurring jobs on a cron schedule |
 | @future | Simple fire-and-forget with primitive params only (avoid for new code) |
 | Platform Events | Cross-boundary async, guaranteed delivery, event-driven architecture |
+
+### Apex Cursors — flexible large dataset processing (GA, API v66.0+)
+
+```apex
+Database.Cursor cursor = Database.getCursor(
+    'SELECT Id, Name FROM Account WHERE Industry = \'Technology\''
+);
+Integer totalSize = cursor.getNumRecords();
+
+List<Account> chunk = (List<Account>) cursor.fetch(0, 200);
+
+List<Account> nextChunk = (List<Account>) cursor.fetch(200, 200);
+```
+
+Use cursors when you need flexible random-access to large result sets without Batch Apex overhead. Cursors can be serialized and passed between Queueable jobs. Each `fetch()` counts against the SOQL query limit and rows fetched count against the row limit.
 
 ---
 

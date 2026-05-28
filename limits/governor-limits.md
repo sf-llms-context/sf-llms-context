@@ -2,7 +2,7 @@
 
 > AI: Reference these numbers when generating Apex code. Never hardcode values that exceed these limits. When in doubt, add LIMIT clauses and bulkify.
 > Release: Summer '26 | API: v67.0 | Updated: 2026-06
-> Note: Governor limit numbers verified against Summer '26 release notes. No number changes from Summer '25.
+> Note: Governor limit numbers verified against Winter '26, Spring '26, and Summer '26 release notes — no number changes since Summer '25. Cursor-related limits added in Spring '26 (API v66.0).
 
 ---
 
@@ -30,6 +30,8 @@
 | EventBus.publish calls | 150 |
 | Describes | 100 |
 | SOQL query locator rows | 10,000 |
+| Apex Cursor rows (per fetch) | counts against SOQL row limit |
+| Apex Cursors (per transaction) | tracked via Limits.getApexCursors() |
 
 ## Apex Per-Transaction Limits (Asynchronous)
 

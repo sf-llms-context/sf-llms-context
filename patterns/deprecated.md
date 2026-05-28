@@ -223,6 +223,30 @@ public class RecordProcessor implements Queueable {
 ```
 - WHY: Queueable supports chaining, complex parameters, and job monitoring. `@future` is fire-and-forget only.
 
+### Abstract/override methods without access modifiers
+
+- BAD:
+```apex
+public virtual class BaseHandler {
+    virtual void handleRecord(SObject record) { }
+}
+
+public class ChildHandler extends BaseHandler {
+    override void handleRecord(SObject record) { }
+}
+```
+- GOOD:
+```apex
+public virtual class BaseHandler {
+    public virtual void handleRecord(SObject record) { }
+}
+
+public class ChildHandler extends BaseHandler {
+    public override void handleRecord(SObject record) { }
+}
+```
+- WHY: Since API v65.0 (Winter '26), `abstract` and `override` methods require an explicit access modifier (`protected`, `public`, or `global`). Omitting it causes a compilation error.
+
 ### String concatenation for multiline text
 
 - BAD:
@@ -372,6 +396,18 @@ async connectedCallback() {
 </template>
 ```
 - WHY: `if:true` and `if:false` are deprecated since Spring '23. Use `lwc:if`, `lwc:elseif`, `lwc:else`.
+
+### lightning/uiGraphQLApi module
+
+- BAD:
+```javascript
+import { gql, graphql } from 'lightning/uiGraphQLApi';
+```
+- GOOD:
+```javascript
+import { gql, graphql } from 'lightning/graphql';
+```
+- WHY: `lightning/graphql` supersedes `lightning/uiGraphQLApi` since Winter '26 (API v65.0). The new module supports optional fields (inaccessible fields are omitted instead of failing), dynamic queries with string interpolation, and mutations (GA in Spring '26).
 
 ---
 
