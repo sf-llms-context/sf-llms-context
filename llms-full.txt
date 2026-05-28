@@ -588,50 +588,58 @@ for (Account acc : accounts) {
 
 > AI: Reference these numbers when generating Apex code. Never hardcode values that exceed these limits. When in doubt, add LIMIT clauses and bulkify.
 > Release: Summer '26 | API: v67.0 | Updated: 2026-06
-> Note: Governor limit numbers verified against Winter '26, Spring '26, and Summer '26 release notes — no number changes since Summer '25. Cursor-related limits added in Spring '26 (API v66.0).
+> Source: Verified against Salesforce Apex Developer Guide (Summer '26 edition). Cursor limits added in Spring '26 (API v66.0). No core limit numbers have changed since Summer '25.
 
 ---
 
-## Apex Per-Transaction Limits (Synchronous)
+## Apex Per-Transaction Limits
 
-| Limit | Value |
-|---|---|
-| SOQL queries | 100 |
-| SOQL rows retrieved | 50,000 |
-| SOSL queries | 20 |
-| SOSL rows retrieved | 2,000 |
-| DML statements | 150 |
-| DML rows | 10,000 |
-| Heap size | 6 MB |
-| CPU time | 10,000 ms |
-| Callouts (HTTP/Web Service) | 100 |
-| Callout timeout (total) | 120,000 ms |
-| Single callout timeout | 120,000 ms |
-| Future calls | 50 |
-| Queueable jobs enqueued | 50 |
-| Batch Apex jobs queued/active | 5 |
-| Email invocations (single) | 10 |
-| Email invocations (mass) | 10 |
-| Push notifications | 10 |
-| EventBus.publish calls | 150 |
-| Describes | 100 |
-| SOQL query locator rows | 10,000 |
-| Apex Cursor rows (per fetch) | counts against SOQL row limit |
-| Apex Cursors (per transaction) | tracked via Limits.getApexCursors() |
+This table lists synchronous and asynchronous limits. Async = Batch Apex, Queueable, @future, scheduled.
 
-## Apex Per-Transaction Limits (Asynchronous)
+| Limit | Sync | Async |
+|---|---|---|
+| SOQL queries | 100 | 200 |
+| SOQL rows retrieved | 50,000 | 50,000 |
+| Database.getQueryLocator rows | 10,000 | 10,000 |
+| SOSL queries | 20 | 20 |
+| SOSL rows per query | 2,000 | 2,000 |
+| DML statements | 150 | 150 |
+| DML rows | 10,000 | 10,000 |
+| Stack depth (recursive triggers via insert/update/delete) | 16 | 16 |
+| Callouts (HTTP/Web Service) | 100 | 100 |
+| Callout timeout (cumulative) | 120,000 ms | 120,000 ms |
+| @future methods invoked | 50 | 0 in batch/future; 50 in queueable |
+| Queueable jobs enqueued (System.enqueueJob) | 50 | 1 |
+| sendEmail invocations | 10 | 10 |
+| Heap size | 6 MB | 12 MB |
+| CPU time | 10,000 ms | 60,000 ms |
+| Max transaction execution time | 10 minutes | 10 minutes |
+| Push notification method calls | 10 | 10 |
+| Push notifications per call | 2,000 | 2,000 |
+| EventBus.publish (publish immediately) | 150 | 150 |
 
-Async methods (Batch, Queueable, Future, Scheduled) get higher limits:
+Notes:
+- Email services heap size: **50 MB** (override of the 6 MB sync heap for email services).
+- "Describes" no longer has a hard per-transaction limit — describe operations are cached and don't count.
+- Scheduled Apex uses synchronous limits despite being async-launched.
+- For Bulk API/Bulk API 2.0 transactions, the effective limit is the higher of the sync/async values.
 
-| Limit | Value |
-|---|---|
-| SOQL queries | 200 |
-| Heap size | 12 MB |
-| CPU time | 60,000 ms |
+## Apex Cursor Limits (Spring '26, API v66.0+)
 
-All other limits remain the same as synchronous.
+Cursors are tracked separately from regular SOQL — they have their own row and call quotas.
 
-**Elastic Limits (Beta, Summer '26):** Orgs can enable elastic limits for Queueable and @future jobs. The elastic limit is 2x the org's licensed daily async job limit. Jobs exceeding the licensed limit are processed at a throttled rate instead of failing.
+| Limit | Sync | Async |
+|---|---|---|
+| Total rows across all cursors per transaction | 50,000,000 | 50,000,000 |
+| Cursor.fetch() calls per transaction | 100 | 100 |
+| New cursors created per 24 hours | 10,000 | 10,000 |
+| New cursor + pagination rows per 24 hours | 100,000,000 | 100,000,000 |
+| Pagination cursor instances per transaction | 50 | 50 |
+| Pagination cursor instances per 24 hours | 200,000 | 200,000 |
+| Rows across all pagination cursors per transaction | 100,000 | 100,000 |
+| Rows per page from a pagination cursor | 2,000 | 2,000 |
+
+**Elastic Limits (Beta, Summer '26):** Orgs can enable elastic limits for Queueable and @future jobs. The elastic limit is 2× the org's licensed daily async job limit (capped at +10M executions). Jobs exceeding the licensed limit are throttled instead of failing.
 
 ## Batch Apex Limits
 
@@ -640,9 +648,22 @@ All other limits remain the same as synchronous.
 | Max batch size (scope) | 2,000 |
 | Default batch size | 200 |
 | QueryLocator rows | 50,000,000 |
-| Concurrent batch jobs | 5 |
-| Flex queue max | 100 |
+| Concurrent batch jobs queued or active | 5 |
+| Flex queue (Holding status) | 100 |
+| Concurrent start method executions | 1 |
 | execute re-tries on failure | 0 |
+
+## Platform / Org-Level Limits
+
+These limits aren't per-transaction — they apply across the entire org over time. AI should be aware they exist but doesn't need exact numbers when generating code.
+
+| Limit | Value |
+|---|---|
+| Daily async Apex executions (batch + queueable + future + scheduled) | 250,000 or 200 × user licenses, whichever is greater |
+| Concurrent long-running sync transactions (>5s each) | 10–50 (based on org license count) |
+| Max scheduled Apex classes concurrently | 100 (5 in Developer Edition) |
+
+Why this matters: even when a single transaction stays within per-transaction limits, an org can hit daily caps under load. Prefer Batch Apex over many small Queueable jobs when processing huge volumes.
 
 ## Platform Events
 
