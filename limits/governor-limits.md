@@ -259,14 +259,31 @@ Notes:
 
 ## Flows
 
-| Limit | Value |
-|---|---|
-| Interviews per transaction | 2,000 |
-| Elements executed per interview | 2,000 |
-| SOQL queries | Same as Apex (100/200) |
-| DML statements | Same as Apex (150) |
-| Scheduled paths per flow | 10 |
-| Scheduled path time range | Up to 6 months |
+Flows execute inside an Apex transaction and inherit per-transaction Apex governor limits.
+
+| Limit | Value | Source |
+|---|---|---|
+| SOQL queries per transaction | Same as Apex (100 sync / 200 async) | inherited |
+| DML statements per transaction | Same as Apex (150) | inherited |
+| Records retrieved by SOQL | Same as Apex (50,000) | inherited |
+| Records processed by DML | Same as Apex (10,000) | inherited |
+| CPU time per transaction | Same as Apex (10,000 ms sync / 60,000 ms async) | inherited |
+| Heap size | Same as Apex (6 MB sync / 12 MB async) | inherited |
+| Max flow interview size | 1,000,000 bytes (~1 MB) | multi-source |
+| Duplicate updates per batch | 12 | Trailhead "Avoid Flow Limits" |
+
+Notes:
+- **The 2,000-elements-per-flow runtime limit was REMOVED in API v57.0 (Spring '23).** Code generators and older guides may still cite it — don't.
+- A single flow interview is one running instance of a flow. Multiple interviews can run in the same transaction; one interview can span multiple transactions (via Pause elements or Scheduled Paths).
+- Bulkification works automatically for `Get Records` / `Create Records` / `Update Records` / `Delete Records` in record-triggered flows — Salesforce pauses interviews at these elements and executes them together as one DML/SOQL operation.
+
+**Unverified (not in any AI-accessible source):**
+- Interviews per transaction cap (commonly cited as 2,000, source unknown)
+- Scheduled paths per flow (commonly cited as 10)
+- Scheduled path max time range from trigger (commonly cited as months)
+- Daily paused/waiting flow interviews cap
+
+For these, consult the official Flow Limits and Considerations page in Salesforce Help (`platform.flow_considerations_limit.htm`).
 
 ## Data Storage
 
