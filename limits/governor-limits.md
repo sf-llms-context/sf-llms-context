@@ -82,29 +82,75 @@ Why this matters: even when a single transaction stays within per-transaction li
 
 ## Platform Events
 
+Per-transaction (Apex):
+
 | Limit | Value |
 |---|---|
-| Publish calls per transaction | 150 |
-| EventBus.publish per call | 1 event (list overload allows multiple) |
-| High-volume event delivery | Up to 100,000/hour (varies by edition) |
-| Standard-volume daily limit | Varies by edition |
-| CometD subscribers | Varies by edition |
-| Event retention | 72 hours (high-volume) |
+| `EventBus.publish` calls per transaction | 150 |
+| Per-call payload | 1 event (use list overload to publish multiple) |
+| Max event message size | 1 MB |
+| Test method publishing limit (`@isTest`) | 500 event messages |
 
-Note: Standard Volume Platform Events are no longer supported starting Winter '27. Migrate to High Volume Platform Events.
+Common allocations (per org, by edition):
+
+| Description | Perf/Unlim | Enterprise | Developer | Pro (+API) |
+|---|---|---|---|---|
+| Max platform event definitions per org | 100 | 50 | 5 | 5 |
+| Max concurrent CometD subscribers (all event types, all channels) | 2,000 | 1,000 | 20 | 20 |
+| Max Process Builder + Flow subscribers per platform event | 4,000 | 4,000 | 4,000 | 5 |
+| Max **active** PB + Flow subscribers per platform event | 2,000 | 2,000 | 2,000 | 5 |
+| Max custom channels for Platform Events (excl. Real-Time Event Monitoring) | 100 | 100 | 100 | 100 |
+| Max custom channels for Real-Time Event Monitoring | 3 | 3 | 3 | 3 |
+| Max distinct custom platform events per channel (channel members) | 50 | 50 | 5 | 5 |
+| Max Real-Time Event Monitoring events per channel | 10 | 10 | 10 | 10 |
+
+Default event publishing & delivery (no add-on):
+
+| Description | Perf/Unlim | Enterprise / Pro (+API) | Developer |
+|---|---|---|---|
+| Event delivery — max messages delivered to API subscribers in last 24h (shared with CDC) | 50,000 | 25,000 | 10,000 |
+| Event publishing — max messages published per hour | 250,000 | 250,000 | 50,000 |
+| Event retention (high-volume) | 72 hours | 72 hours | 72 hours |
+
+Notes:
+- Delivery allocation applies only to **API subscribers**: Pub/Sub API, CometD, empApi Lightning components, event relays. **Does NOT apply** to Apex triggers, flows, or Process Builder processes.
+- Delivery allocation is **shared** between high-volume Platform Events and Change Data Capture events.
+- Standard Volume Platform Events (defined in API v44.0 and earlier) are no longer supported starting **Winter '27**. Migrate to High Volume Platform Events.
+- A platform event add-on license adds +100,000 events/day delivery, +25,000 events/hour publishing, and a 3M monthly entitlement with grace allocation.
+- When the publishing limit is exceeded, the publish call fails with `LIMIT_EXCEEDED`. When the delivery limit is exceeded, subscribers receive `403::Organization total events daily limit exceeded` (CometD) or `sfdc.platform.eventbus.grpc.subscription.limit.exceeded` (Pub/Sub API).
 
 ### Pub/Sub API
 
 | Limit | Value |
 |---|---|
 | Max event message size | 1 MB |
-| Max recommended batch in a PublishRequest | 3 MB (gRPC hard cap is 4 MB) |
+| Max recommended batch in a `PublishRequest` | 3 MB (gRPC hard cap is 4 MB) |
 | Recommended events per publish request | ≤ 200 |
 | Max events per `FetchRequest` / `ManagedFetchRequest` | 100 |
 | Max managed subscriptions per org | 200 |
 | gRPC concurrent streams per channel | 1,000 (HTTP/2 underlying connection) |
 
 Note: Pub/Sub API is the recommended subscription channel for new integrations. CometD remains supported but is in maintenance mode.
+
+## Change Data Capture
+
+Per org, by edition:
+
+| Description | Perf/Unlim | Enterprise | Developer |
+|---|---|---|---|
+| Max concurrent CometD subscribers (shared across all event types) | 2,000 | 1,000 | 20 |
+| Max event message size | 1 MB | 1 MB | 1 MB |
+| Max entities selected for change notifications (across all channels) | 5 | 5 | 5 |
+| Max custom channels for CDC (separate from Platform Events) | 100 | 100 | 100 |
+| Event delivery — max messages delivered to API subscribers in last 24h (shared with high-volume PE) | 50,000 | 25,000 | 10,000 |
+| Event retention | 72 hours | 72 hours | 72 hours |
+
+Notes:
+- **No publishing limit** for CDC — Salesforce generates change events from record DML, not user-published.
+- 5-entity limit applies to selections you make and selections by unmanaged/managed packages (except AppExchange-released managed packages).
+- Multiple DML on the same record in the same transaction produce **one** change event with the committed final state, not one per DML.
+- Use custom channels with stream filtering to reduce delivery allocation usage.
+- If a change event exceeds 1 MB, a **gap event** is published instead.
 
 ## Bulk API 2.0
 
