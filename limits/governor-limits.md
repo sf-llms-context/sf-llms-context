@@ -96,22 +96,44 @@ Note: Standard Volume Platform Events are no longer supported starting Winter '2
 
 | Limit | Value |
 |---|---|
-| Max file size per upload | 150 MB |
-| Max records per batch | 10,000 |
-| Max batches per job | 15,000 |
-| Max fields per record | 5,000 |
-| Concurrent jobs (query) | 5 |
-| Concurrent jobs (ingest) | 7 (Enterprise), varies by edition |
+| Max file size per upload (base64 encoded) | 150 MB |
+| Recommended raw data size (pre-encoding) | 100 MB |
+| Records per batch (auto-split) | 10,000 |
+| Daily max records per ingest job | 150,000,000 |
+| Per-batch processing timeout | 5 minutes |
+| Per-batch retry attempts | 20 |
+| Bulk API CPU time (isolated from Apex limit) | 60,000 ms |
 
-## REST API
+Note: Concurrent job limits, max fields per record, and other allocation-style limits aren't in the Bulk API Developer Guide — they live in the Limits and Allocations cheat sheet (currently unverified).
+
+## REST API — Composite
+
+| Limit | Value |
+|---|---|
+| Composite Batch subrequests | 25 per call |
+| Composite Batch timeout | 10 minutes |
+| Composite Graph total nodes per payload | 500 |
+| Composite Graph graphs per payload | 75 |
+| Composite Graph max depth | 15 |
+| Composite Graph different node types per payload | 15 |
+| Composite Graph max failed graphs before halt | 14 |
+
+Note: Composite Graph counts a node as "different" when it uses a different API version, HTTP method, or sObject type.
+
+## REST API — sObject Tree
+
+| Limit | Value |
+|---|---|
+| Max records (total across all trees) | 200 |
+| Max different object types | 5 |
+| Max tree depth | 5 levels |
+
+## REST API — General
 
 | Limit | Value |
 |---|---|
 | API calls per 24h | Varies by edition (org-level) |
-| Composite subrequests | 25 per call |
-| Composite Graph subrequests | 500 per call |
-| SObject Tree max records | 200 |
-| Request body size | 50 MB |
+| Query batch size (Sforce-Query-Options header) | 200–2,000 (default 2,000) |
 
 ## Flows
 
