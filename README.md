@@ -38,6 +38,8 @@ https://raw.githubusercontent.com/sf-llms-context/sf-llms-context/main/llms-full
 
 Copy the contents of any file in `patterns/`, `limits/`, or `api/` directly into your AI tool's context or system prompt.
 
+> **Tools without web access (e.g. free ChatGPT):** paste the *content* of `llms-full.txt`, or upload it as a file — do **not** just paste the URL. Without browsing, the model never fetches the link and silently runs with no context.
+
 ### Method 4: MCP Server (coming soon)
 
 ```bash

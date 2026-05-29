@@ -157,7 +157,7 @@ insert accounts;
 List<Account> accounts = [SELECT Id, Name FROM Account WITH USER_MODE];
 insert as user accounts;
 ```
-- WHY: Since API v67.0 (Summer '26), database operations default to User Mode — they enforce the current user's CRUD, FLS, and sharing. In v66.0 and earlier, they default to System Mode. Always set access mode explicitly (`WITH USER_MODE`/`WITH SYSTEM_MODE` for queries, `as user`/`as system` for DML) to make intent clear.
+- WHY: Since API v67.0 (Summer '26), database operations default to User Mode — they enforce the current user's CRUD, FLS, and sharing. **Default to User Mode (`WITH USER_MODE` / `AccessLevel.USER_MODE` / `as user`) for any operation acting on a user's behalf — including trigger logic.** Use System Mode (`WITH SYSTEM_MODE` / `as system`) only when you deliberately need to bypass FLS, CRUD, and sharing, and say why in a comment. Setting the mode explicitly is not enough — picking System Mode by default silently runs without security checks.
 
 ### String concatenation in SOQL
 
@@ -181,7 +181,7 @@ List<Account> accounts = Database.query(query);
 static void testInsert() {
     Account acc = new Account(Name = 'Test');
     insert acc;
-    System.assertNotEquals(null, acc.Id);
+    Assert.isNotNull(acc.Id, 'Account should have an Id after insert');
 }
 ```
 - GOOD:
@@ -193,10 +193,26 @@ static void testInsertBulk() {
         accounts.add(new Account(Name = 'Test ' + i));
     }
     insert accounts;
-    System.assertEquals(200, [SELECT COUNT() FROM Account]);
+    Assert.areEqual(200, [SELECT COUNT() FROM Account], 'All 200 accounts should be inserted');
 }
 ```
 - WHY: Triggers and automation fire on bulk operations. Testing with 1 record hides governor limit issues.
+
+### Legacy assertion methods (System.assert*)
+
+- BAD:
+```apex
+System.assertEquals(200, results.size());
+System.assert(result.isSuccess());
+System.assertNotEquals(null, acc.Id);
+```
+- GOOD:
+```apex
+Assert.areEqual(200, results.size(), 'Expected 200 results');
+Assert.isTrue(result.isSuccess(), 'Save should succeed');
+Assert.isNotNull(acc.Id, 'Account should have an Id');
+```
+- WHY: The `Assert` class (Winter '23) is the modern assertion API. It has explicit, type-safe methods (`areEqual`, `areNotEqual`, `isTrue`, `isFalse`, `isNull`, `isNotNull`, `isInstanceOfType`, `fail`), clearer failure output, and you can't accidentally swap the expected value with the message string. `System.assert*` still compiles but is no longer the recommended style.
 
 ### @future for complex async
 
