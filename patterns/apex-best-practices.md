@@ -275,7 +275,7 @@ private class OpportunityServiceTest {
         insert opps;
         Test.stopTest();
 
-        System.assertEquals(5, [SELECT COUNT() FROM Opportunity]);
+        Assert.areEqual(5, [SELECT COUNT() FROM Opportunity], 'All 5 opportunities should be inserted');
     }
 }
 ```
@@ -288,7 +288,9 @@ Always wrap the method under test in `Test.startTest()` / `Test.stopTest()` to g
 
 ## Security — Access Modes (Summer '26 / API v67.0)
 
-Since API v67.0, database operations run in **User Mode by default** — they enforce the current user's CRUD, FLS, and sharing. In v66.0 and earlier, they default to System Mode. Always set access mode explicitly.
+Since API v67.0, database operations run in **User Mode by default** — they enforce the current user's CRUD, FLS, and sharing. In v66.0 and earlier, they default to System Mode.
+
+**Default to User Mode** (`WITH USER_MODE`, `AccessLevel.USER_MODE`, `as user`) for any operation acting on a user's behalf — including trigger logic. Reach for System Mode **only** when you deliberately need to bypass security, and comment why. Choosing System Mode by default silently skips FLS/CRUD/sharing — setting the mode explicitly does not make System Mode safe.
 
 ### SOQL/SOSL — WITH USER_MODE / WITH SYSTEM_MODE
 
@@ -327,12 +329,14 @@ List<Account> results = Database.query(
 ### Security.stripInaccessible()
 
 ```apex
+// Intentional System Mode: query runs unrestricted, then fields are
+// stripped down to what the running user can actually see.
 List<Account> accounts = [SELECT Id, Name, Phone, Revenue__c FROM Account WITH SYSTEM_MODE];
 SObjectAccessDecision decision = Security.stripInaccessible(AccessType.READABLE, accounts);
 List<Account> sanitized = decision.getRecords();
 ```
 
-Silently removes inaccessible fields instead of throwing. Use when you need System Mode query results filtered for a specific user's access.
+Silently removes inaccessible fields instead of throwing. This is the deliberate System Mode case: query broadly, then filter for a specific user's access. For normal record access, prefer `WITH USER_MODE` directly.
 
 ### Sharing declarations — always explicit
 
