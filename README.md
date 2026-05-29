@@ -66,9 +66,9 @@ npx @sf-llms/context
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) (coming soon).
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Found a pattern where AI generates wrong Salesforce code? [Open an issue](../../issues/new).
+Found a pattern where AI generates wrong Salesforce code? [Open an issue](https://github.com/sf-llms-context/sf-llms-context/issues/new/choose).
 
 ## License
 
