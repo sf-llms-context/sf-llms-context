@@ -1,0 +1,37 @@
+name: "Outdated info"
+description: A governor limit, API version, or feature status in this repo is wrong or stale.
+title: "[Outdated] "
+labels: ["outdated"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Precision is the whole point of this project. Every fix needs an official source.
+  - type: input
+    id: file
+    attributes:
+      label: File and line
+      description: Which file (and line if you have it).
+      placeholder: limits/governor-limits.md
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: What it says now
+    validations:
+      required: true
+  - type: textarea
+    id: correct
+    attributes:
+      label: What it should say
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Official source
+      description: PDF page, Help article URL, or Trailhead unit. Required.
+      placeholder: https://developer.salesforce.com/docs/...
+    validations:
+      required: true

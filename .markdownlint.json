@@ -1,0 +1,13 @@
+{
+  "comment": "Lenient where it conflicts with this repo's deliberately dense, token-efficient format. Structural rules (heading hierarchy, duplicate fragments, broken indentation) stay on.",
+  "default": true,
+  "MD013": false,
+  "MD031": false,
+  "MD032": false,
+  "MD033": false,
+  "MD034": false,
+  "MD040": false,
+  "MD041": false,
+  "MD060": false,
+  "MD024": { "siblings_only": true }
+}
