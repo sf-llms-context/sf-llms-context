@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly link check to catch external doc rot (Mondays 06:00 UTC)
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  markdownlint:
+    name: Markdown lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DavidAnson/markdownlint-cli2-action@v19
+        with:
+          globs: |
+            **/*.md
+            !RESEARCH.md
+            !PLAN.md
+
+  linkcheck:
+    name: Link check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: lycheeverse/lychee-action@v2
+        with:
+          args: "--no-progress --accept 200,429 './**/*.md' './**/*.txt'"
+          fail: true
+
+  llms-full-sync:
+    name: llms-full.txt in sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Regenerate and diff
+        run: |
+          cat patterns/deprecated.md \
+              limits/governor-limits.md \
+              patterns/apex-best-practices.md \
+              patterns/lwc-best-practices.md \
+              patterns/soql-best-practices.md \
+              patterns/flow-best-practices.md \
+              > llms-full.generated.txt
+          if ! diff -q llms-full.txt llms-full.generated.txt > /dev/null; then
+            echo "::error::llms-full.txt is out of sync. Regenerate it (see CONTRIBUTING.md)."
+            diff llms-full.txt llms-full.generated.txt || true
+            exit 1
+          fi
+          echo "llms-full.txt is in sync."

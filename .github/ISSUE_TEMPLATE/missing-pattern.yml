@@ -1,0 +1,44 @@
+name: "Missing pattern"
+description: A Salesforce pattern, limit, or best practice that should be covered but isn't.
+title: "[Missing] "
+labels: ["missing-content"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        We're opinionated and curated, not comprehensive. Make the case for why an AI agent needs this.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Apex
+        - LWC
+        - SOQL/SOSL
+        - Flow
+        - Governor limits
+        - API (REST / Bulk / Pub-Sub)
+        - Release notes
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: pattern
+    attributes:
+      label: What's missing
+      description: The pattern or fact, and where it would live (which file).
+    validations:
+      required: true
+  - type: textarea
+    id: why-ai
+    attributes:
+      label: Why an AI needs it
+      description: Does an AI tool get this wrong today? Show the failure if you can.
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Official source
+      description: Required for any limit or API version.
+      placeholder: https://developer.salesforce.com/docs/...

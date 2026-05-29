@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Salesforce official docs
+    url: https://developer.salesforce.com/docs
+    about: For general Salesforce questions. This repo only tracks AI-relevant patterns and verified facts.

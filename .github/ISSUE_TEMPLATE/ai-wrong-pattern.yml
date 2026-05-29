@@ -1,0 +1,46 @@
+name: "AI generates wrong pattern"
+description: An AI tool produced outdated or incorrect Salesforce code that this project should prevent.
+title: "[Wrong pattern] "
+labels: ["deprecated-pattern"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. These issues feed directly into `patterns/deprecated.md`.
+  - type: input
+    id: ai-tool
+    attributes:
+      label: Which AI tool
+      description: e.g. Claude, GPT-4, Copilot, Cursor, Gemini
+      placeholder: Claude (Sonnet 4.6)
+    validations:
+      required: true
+  - type: textarea
+    id: generated
+    attributes:
+      label: What it generated
+      description: Paste the bad code.
+      render: apex
+    validations:
+      required: true
+  - type: textarea
+    id: whats-wrong
+    attributes:
+      label: What's wrong with it
+      description: Governor limit hit, deprecated API, security gap, etc.
+    validations:
+      required: true
+  - type: textarea
+    id: correct
+    attributes:
+      label: Correct pattern
+      description: The code an AI should have generated instead.
+      render: apex
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Official source (optional but appreciated)
+      description: PDF page, Help article URL, or Trailhead unit backing the correct pattern.
+      placeholder: https://developer.salesforce.com/docs/...
