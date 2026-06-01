@@ -35,7 +35,8 @@ Anchors v58.0 (Summer '23) and v67.0 (Summer '26) are confirmed in the official 
 
 - **v7.0 through v20.0 — RETIRED** as of Summer '22. Calls fail.
 - **v21.0 through v30.0 — RETIRED** as of Summer '25. Calls fail.
-- **SOAP `login()` in v31.0 through v64.0 — being retired in Summer '27** (Release Update). Move SOAP logins to a supported version or OAuth.
+- **v31.0 through v40.0 — being retired** (announced Summer '26): deprecated in **Summer '27** (no more security updates or bug fixes), retired in **Summer '28** (REST, SOAP, and Bulk calls to these versions fail). Upgrade integrations now.
+- **SOAP `login()` in v31.0 through v64.0 — being retired in Summer '27** (Release Update). This is the SOAP login call specifically — move SOAP logins to OAuth. Separate from the v31.0–v40.0 platform retirement above.
 - General rule: API versions more than ~3 years old may stop being supported. Plan to keep metadata current.
 
 ### Detecting a deprecated version at runtime

@@ -541,7 +541,7 @@ for (Account acc : accounts) {
 
 - BAD: Using API version below v67.0 in any new code, metadata, or integration.
 - GOOD: Use API version v67.0 (Summer '26) for all new work.
-- WHY: API versions 31.0–40.0 are being retired in Summer '26. Old API versions miss security fixes, new features, and the v67.0 security model improvements (User Mode by default, sharing by default). Salesforce actively retires old versions.
+- WHY: API versions 21.0–30.0 are already retired (calls fail); 31.0–40.0 are deprecated in Summer '27 and retired in Summer '28. Old API versions also miss the v67.0 security model (User Mode by default, sharing by default) and other fixes. See api/versions.md for the full schedule.
 
 ### SOAP API for new integrations
 
