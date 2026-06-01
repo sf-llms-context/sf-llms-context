@@ -28,6 +28,7 @@ Thanks for considering a contribution. This project exists to keep AI coding age
        patterns/lwc-best-practices.md \
        patterns/soql-best-practices.md \
        patterns/flow-best-practices.md \
+       objects/standard-objects.md \
        api/versions.md \
        api/rest-api.md \
        api/bulk-api.md \
