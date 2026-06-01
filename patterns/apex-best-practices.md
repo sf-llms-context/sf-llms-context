@@ -50,6 +50,13 @@ public with sharing class OpportunityTriggerHandler {
 }
 ```
 
+**Default to static methods.** The trigger stays logic-free and calls `Handler.run(...)`; the handler exposes a `static run` dispatcher and one focused `private static` method per trigger operation.
+
+- BAD: instantiate the handler — `new OpportunityTriggerHandler(Trigger.new).run();` — unless your org already standardizes on an instance-based handler framework.
+- BAD: one catch-all method handling every operation, or business logic inline in the trigger body.
+- GOOD: one bulkified `private static` method per operation (`setDefaults`, `validateChanges`, …), as shown above.
+- WHY: static keeps the call path obvious and stateless; one method per operation keeps each path bulkified and testable.
+
 Note: Triggers always run in System Mode (all API versions). The handler class enforces sharing and access control. Always declare `with sharing`, `without sharing`, or `inherited sharing` explicitly on handler classes — since API v67.0, omitting the declaration defaults to `with sharing`.
 
 ---
