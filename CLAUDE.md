@@ -60,7 +60,7 @@ Every pattern file follows this structure:
 ```markdown
 # [Topic] — Salesforce [Best Practices / Deprecated Patterns]
 > AI: [One-line instruction — when to read this file]
-> Release: Summer '25 | API: v64.0 | Updated: 2025-06
+> Release: Summer '26 | API: v67.0 | Updated: 2026-06
 
 ## [Category]
 
@@ -117,9 +117,9 @@ Use `@modelcontextprotocol/sdk` package. Keep it under 150 lines.
 
 ## Current Salesforce release info
 
-- Current release: Summer '25
-- API version: v64.0
-- Next release: Winter '26 (Oct 2025)
+- Current release: Summer '26
+- API version: v67.0
+- Next release: Winter '27 (Oct 2026)
 - Release notes: https://help.salesforce.com/s/articleView?id=release-notes.salesforce_release_notes.htm
 
 ## Git
