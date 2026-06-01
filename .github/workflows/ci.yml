@@ -47,6 +47,9 @@ jobs:
               patterns/lwc-best-practices.md \
               patterns/soql-best-practices.md \
               patterns/flow-best-practices.md \
+              api/versions.md \
+              api/rest-api.md \
+              api/bulk-api.md \
               > llms-full.generated.txt
           if ! diff -q llms-full.txt llms-full.generated.txt > /dev/null; then
             echo "::error::llms-full.txt is out of sync. Regenerate it (see CONTRIBUTING.md)."
