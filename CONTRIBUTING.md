@@ -6,7 +6,7 @@ Thanks for considering a contribution. This project exists to keep AI coding age
 
 - **Wrong patterns AI generates** — open an issue with: which AI tool, what it generated, what's wrong, what the correct pattern is. We add it to `patterns/deprecated.md`.
 - **Outdated numbers** — governor limits, API versions, retired features. Cite the official Salesforce source (PDF page, Help article URL, Trailhead unit).
-- **New release content** — when Salesforce ships Winter '27, Spring '27, etc., the existing files need verification and updates.
+- **New release content** — when Salesforce ships Winter '27, Spring '27, etc., the existing files need verification and updates. See [RELEASING.md](RELEASING.md) for the full per-release process.
 - **Better examples** — clearer or more representative code samples for existing patterns.
 
 ## What we don't want
