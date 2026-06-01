@@ -15,6 +15,10 @@
 - [LWC Best Practices](patterns/lwc-best-practices.md): Lightning Data Service, lwc:if, lwc:ref, custom events, LMS, GraphQL
 - [Flow Best Practices](patterns/flow-best-practices.md): Record-Triggered Flow patterns, before-save vs after-save, fault paths, subflows
 
+## Objects
+
+- [Standard Objects](objects/standard-objects.md): What AI gets wrong — real API names (Product2, Pricebook2), Opportunity/Contact and Lead-conversion relationships, polymorphic fields (OwnerId, WhoId/WhatId), Activities
+
 ## API
 
 - [API Versions](api/versions.md): Current version (v67.0), release-to-version map, retired versions, and using the current version on new metadata

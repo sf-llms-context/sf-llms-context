@@ -47,6 +47,7 @@ jobs:
               patterns/lwc-best-practices.md \
               patterns/soql-best-practices.md \
               patterns/flow-best-practices.md \
+              objects/standard-objects.md \
               api/versions.md \
               api/rest-api.md \
               api/bulk-api.md \
