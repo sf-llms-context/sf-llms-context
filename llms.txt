@@ -21,6 +21,10 @@
 - [REST API](api/rest-api.md): OAuth, versioned endpoints, query pagination, and Composite/Collections instead of one call per record
 - [Bulk API 2.0](api/bulk-api.md): When to use Bulk vs REST, ingest/query job lifecycle, CSV, polling, and result handling
 
+## Releases
+
+- [Summer '26 (current)](releases/current.md): Secure-by-default Apex on v67.0 (User Mode + with sharing), API retirements, and key Apex/LWC changes
+
 ## Full Context
 
 - [Complete Reference](llms-full.txt): All content concatenated in priority order — single fetch for full context

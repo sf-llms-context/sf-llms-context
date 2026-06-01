@@ -31,6 +31,7 @@ Thanks for considering a contribution. This project exists to keep AI coding age
        api/versions.md \
        api/rest-api.md \
        api/bulk-api.md \
+       releases/current.md \
        > llms-full.txt
    ```
 
