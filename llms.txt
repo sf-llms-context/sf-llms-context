@@ -15,6 +15,12 @@
 - [LWC Best Practices](patterns/lwc-best-practices.md): Lightning Data Service, lwc:if, lwc:ref, custom events, LMS, GraphQL
 - [Flow Best Practices](patterns/flow-best-practices.md): Record-Triggered Flow patterns, before-save vs after-save, fault paths, subflows
 
+## API
+
+- [API Versions](api/versions.md): Current version (v67.0), release-to-version map, retired versions, and using the current version on new metadata
+- [REST API](api/rest-api.md): OAuth, versioned endpoints, query pagination, and Composite/Collections instead of one call per record
+- [Bulk API 2.0](api/bulk-api.md): When to use Bulk vs REST, ingest/query job lifecycle, CSV, polling, and result handling
+
 ## Full Context
 
 - [Complete Reference](llms-full.txt): All content concatenated in priority order — single fetch for full context
