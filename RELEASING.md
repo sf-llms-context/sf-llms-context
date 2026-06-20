@@ -55,13 +55,13 @@ Use the exact `cat` command in `CONTRIBUTING.md` (it lists the files in priority
 
 ## 4. Re-sync GitHub Pages
 
-Pages repo: `sf-llms-context/sf-llms-context.github.io` (working copy `~/dev/web/sf-llms-context.github.io`).
+Pages repo: `sf-llms-context/sf-llms-context.github.io` (working copy `~/dev/sf-llms-context.github.io`).
 
 - `llms-full.txt` — straight copy from the main repo, then push.
 - `llms.txt` — **DO NOT overwrite** with the main repo's version. The Pages `llms.txt` is hand-customized: it uses absolute `raw.githubusercontent.com/.../main/...` links (so links resolve from the hosted site), an absolute `https://sf-llms-context.github.io/llms-full.txt` full-context link, and an extra `## Source` section. Port any new sections/links into it manually with absolute URLs.
 
 ```bash
-PAGES=~/dev/web/sf-llms-context.github.io
+PAGES=~/dev/sf-llms-context.github.io
 cp llms-full.txt "$PAGES/llms-full.txt"
 # edit "$PAGES/llms.txt" by hand if llms.txt changed
 git -C "$PAGES" add -A && git -C "$PAGES" commit -m "Sync <season> '<yy>" && git -C "$PAGES" push
