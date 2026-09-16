@@ -1,7 +1,7 @@
 # LWC Best Practices — Current Patterns
 
 > AI: Use these patterns when generating Lightning Web Components. Default to Lightning Data Service over imperative Apex, use the modern `lwc:if`/`lwc:ref` syntax, and respect Lightning Web Security.
-> Release: Summer '26 | API: v67.0 | Updated: 2026-06
+> Release: Winter '27 | API: v68.0 | Updated: 2026-09
 
 ---
 
@@ -151,6 +151,41 @@ Use the modern directives. `if:true` / `if:false` were deprecated in v59.0 (Wint
     <div>{content}</div>
 </template>
 ```
+
+---
+
+## Template Expressions (GA in Winter '27, requires LWC API v68.0)
+
+Complex JavaScript expressions are allowed directly in the template, anywhere a basic property is allowed.
+
+```html
+<template>
+    <p>{count + 1}</p>
+    <p>{user.firstName + ' ' + user.lastName}</p>
+</template>
+```
+
+Rules:
+
+- Requires `<apiVersion>68.0</apiVersion>` in the component's `.js-meta.xml`. Below v68.0 the template does not compile.
+- Keep expressions short. A getter is still the better home for anything with branching, a loop, or a non-obvious name — the expression syntax removes boilerplate, it does not replace readable code.
+- Do not rewrite existing working getters into expressions; there is no runtime benefit.
+
+---
+
+## Third-Party Web Components — `lwc:external` (GA in Winter '27)
+
+Render a third-party custom element natively instead of rewriting it as an LWC.
+
+```html
+<template>
+    <my-chart lwc:external data-id="revenue"></my-chart>
+</template>
+```
+
+- The component must be registered as a real custom element before use (for example from a static resource loaded in `connectedCallback`).
+- Without `lwc:external`, LWC treats an unknown tag as a compile error.
+- The element still runs under Lightning Web Security — check the library for `window`-level global access.
 
 ---
 
@@ -342,6 +377,8 @@ async handleSave() {
 
 `updateRecord` already invalidates LDS cache for that record — you only need `getRecordNotifyChange` when the change happened outside LDS (Apex callout, external system, custom action).
 
+**State managers (Winter '27):** call `refresh()` on a built-in state manager to refetch list- or query-shaped data (related list records, for example) without reconfiguring the state manager or reloading the page. Use it instead of forcing a full page refresh when only the collection went stale.
+
 ---
 
 ## Navigation
@@ -481,3 +518,5 @@ External libraries must run under **Lightning Web Security** (replaced Locker Se
 | Toast in Lightning Out app | Toasts only work in LEX / Salesforce mobile |
 | Forgetting `key={item.Id}` in `for:each` | Always provide a unique stable key |
 | Importing fields as strings: `fields: ['Account.Name']` | Use `@salesforce/schema/Account.Name` imports |
+| Template expression in a component below API v68.0 | Raise `apiVersion` to 68.0 or use a getter |
+| `window.open(url, '_blank')` for a same-origin URL | Detached anchor click — `window.open` throws `LockerSecurityError` under LWS for Aura |

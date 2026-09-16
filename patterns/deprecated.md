@@ -1,7 +1,7 @@
 # Deprecated Salesforce Patterns — Do NOT Generate These
 
 > AI: Read this file FIRST before generating any Salesforce code. Every pattern here is wrong. Use the GOOD alternative instead.
-> Release: Summer '26 | API: v67.0 | Updated: 2026-06
+> Release: Winter '27 | API: v68.0 | Updated: 2026-09
 
 ---
 
@@ -324,25 +324,23 @@ export default class MyComponent extends LightningElement {
 ```
 - WHY: Aura is in maintenance mode. LWC is faster, uses web standards, and is the only actively developed component framework.
 
-### Template expressions with JS logic
+### Template expressions in components below LWC API v68.0
 
 - BAD:
 ```html
+<!-- component's .js-meta.xml declares <apiVersion>67.0</apiVersion> -->
 <template>
     <p>{count + 1}</p>
     <p>{items.length > 0 ? 'Has items' : 'Empty'}</p>
 </template>
 ```
 - GOOD:
-```html
-<template>
-    <p>{nextCount}</p>
-    <template lwc:if={hasItems}>
-        <p>Has items</p>
-    </template>
-</template>
+```xml
+<!-- either raise the component to v68.0 in its .js-meta.xml ... -->
+<apiVersion>68.0</apiVersion>
 ```
 ```javascript
+// ... or keep the component on an older API version and use a getter
 get nextCount() {
     return this.count + 1;
 }
@@ -350,7 +348,7 @@ get hasItems() {
     return this.items.length > 0;
 }
 ```
-- WHY: LWC templates don't support JavaScript expressions. Use getter properties in the JS class.
+- WHY: complex template expressions went GA in Winter '27 and require LWC API v68.0. Below that version the template does not compile. Getters still read better for anything beyond a short expression, so do not convert working getters to expressions just because the syntax is now allowed.
 
 ### Direct DOM manipulation
 
@@ -424,6 +422,22 @@ import { gql, graphql } from 'lightning/uiGraphQLApi';
 import { gql, graphql } from 'lightning/graphql';
 ```
 - WHY: `lightning/graphql` supersedes `lightning/uiGraphQLApi` since Winter '26 (API v65.0). The new module supports optional fields (inaccessible fields are omitted instead of failing), dynamic queries with string interpolation, and mutations (GA in Spring '26).
+
+### window.open for same-origin URLs (Aura under LWS)
+
+- BAD:
+```javascript
+window.open(url, '_blank');
+```
+- GOOD:
+```javascript
+const link = document.createElement('a');
+link.href = url;
+link.target = '_blank';
+link.rel = 'noopener';
+link.click();
+```
+- WHY: from Winter '27, programmatically opening a same-origin URL in a new tab via `window.open(url, '_blank')` throws a `LockerSecurityError` under Lightning Web Security for Aura. A detached programmatic anchor click handles same-origin navigation and downloads safely.
 
 ---
 
@@ -539,9 +553,9 @@ for (Account acc : accounts) {
 
 ### Outdated API versions
 
-- BAD: Using API version below v67.0 in any new code, metadata, or integration.
-- GOOD: Use API version v67.0 (Summer '26) for all new work.
-- WHY: API versions 21.0–30.0 are already retired (calls fail); 31.0–40.0 are deprecated in Summer '27 and retired in Summer '28. Old API versions also miss the v67.0 security model (User Mode by default, sharing by default) and other fixes. See api/versions.md for the full schedule.
+- BAD: Using API version below v68.0 in any new code, metadata, or integration.
+- GOOD: Use API version v68.0 (Winter '27) for all new work.
+- WHY: API versions 21.0–30.0 are already retired (calls fail); 31.0–40.0 are deprecated in Summer '27 and retired in Summer '28. Apex saved at API versions 9.0–19.0 now raises a compiler warning and is scheduled for retirement. Old API versions also miss the v67.0 security model (User Mode by default, sharing by default) and other fixes. See api/versions.md for the full schedule.
 
 ### SOAP API for new integrations
 
@@ -565,13 +579,19 @@ for (Account acc : accounts) {
 
 - BAD: Creating or using Standard Volume Platform Events.
 - GOOD: Use High Volume Platform Events. Migrate existing ones with the Salesforce migration tool (Tooling API or Metadata API).
-- WHY: Standard Volume Platform Events are no longer supported starting Winter '27. Migrate before then — unmigrated events will stop working.
+- WHY: Standard volume platform events are retired on **December 15, 2026**. Migrate before then — unmigrated events will stop working. Setup offers a one-click migration to high volume platform events.
 
 ### OAuth 2.0 username-password flow
 
 - BAD: Using the OAuth 2.0 username-password flow for Connected App integrations.
 - GOOD: Use the OAuth 2.0 web-server flow (authorization code) or client credentials flow.
-- WHY: Username-password flow is being retired in Winter '27. It bypasses MFA and is a security risk.
+- WHY: Enforcement was postponed from Winter '27 to **February 20, 2027**. The flow passes credentials directly in HTTP requests. Orgs created in Summer '26 and later already have it blocked and cannot re-enable it. For end-user login use the web-server flow with PKCE.
+
+### Salesforce Functions
+
+- BAD: Building new functionality on Salesforce Functions.
+- GOOD: Deploy an alternative before the existing order term ends — Heroku, an external service, or Apex where the work fits platform limits.
+- WHY: Salesforce Functions is no longer available for purchase or renewal and is being retired. Existing subscriptions run only to the end of their current order term.
 
 ### Salesforce to Salesforce
 

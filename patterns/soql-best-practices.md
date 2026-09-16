@@ -1,7 +1,7 @@
 # SOQL Best Practices — Current Patterns
 
 > AI: Use these patterns when generating SOQL queries (Apex, LWC `@wire`, REST, Bulk API). Focus on selectivity, bulkification, and the User Mode security model introduced in v67.0.
-> Release: Summer '26 | API: v67.0 | Updated: 2026-06
+> Release: Winter '27 | API: v68.0 | Updated: 2026-09
 
 ---
 
@@ -42,7 +42,7 @@ A query is **selective** when its WHERE clause filters on an indexed field that 
 
 ### Check selectivity with the Query Plan tool
 
-Use **Developer Console → Query Editor → Query Plan** (or REST API `/services/data/v67.0/query/?explain=...`) to see cost. Cost > 1.0 = not selective.
+Use **Developer Console → Query Editor → Query Plan** (or REST API `/services/data/v68.0/query/?explain=...`) to see cost. Cost > 1.0 = not selective.
 
 ---
 
@@ -393,6 +393,36 @@ SOSL limits per transaction: 20 queries, 2,000 rows per query.
 
 ---
 
+## FORMULA() in WHERE (Beta, Winter '27, API v68.0+)
+
+Compare two fields arithmetically in the WHERE clause without a formula field or post-processing.
+
+```sql
+SELECT Id, Name
+FROM Opportunity
+WHERE FORMULA(Amount - Expected_Revenue__c) > 0
+```
+
+**Do not put this in production code.** The beta runs only in sandbox, Developer Edition, and scratch orgs on API v68.0 and later; it is not available in production orgs. Until it goes GA, a formula field or Apex post-processing remains the only production-safe way to compare fields.
+
+---
+
+## SET OPTIONS (Managed Package Namespaces)
+
+```apex
+Database.QueryOptions opts = new Database.QueryOptions();
+opts.explicitNamespace = 'myNamespace';
+List<SObject> rows = Database.queryWithBinds(
+    'SELECT Id, My_Field__c FROM Account SET OPTIONS :opts',
+    new Map<String, Object>{ 'opts' => opts },
+    AccessLevel.USER_MODE
+);
+```
+
+Only relevant to managed package code: when a package field and a subscriber's custom field share a name, Apex otherwise treats both as belonging to the package namespace and the query fails the unique-field-name rule enforced since API v34.0. Setting `explicitNamespace` resolves the conflict. Not needed in org-local code.
+
+---
+
 ## Common AI-Generated Mistakes
 
 | Mistake | Fix |
@@ -405,3 +435,4 @@ SOSL limits per transaction: 20 queries, 2,000 rows per query.
 | Filtering on formula fields | Add a custom indexed field or restructure the data model |
 | `ORDER BY` without indexed field | Sort in Apex after query, or index the sort field |
 | String concat for dynamic SOQL | Use `Database.queryWithBinds` with a binds map |
+| `FORMULA()` in production code | Beta, sandbox/DE/scratch only — use a formula field in production |

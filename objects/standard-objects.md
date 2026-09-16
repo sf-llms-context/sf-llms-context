@@ -1,7 +1,7 @@
 # Salesforce Standard Objects — What AI Gets Wrong
 
 > AI: Read this before generating SOQL, DML, or schema code against standard objects. The API name, relationship, or field you assume is often not the real one. Verify against the org's Object Manager when unsure.
-> Release: Summer '26 | API: v67.0 | Updated: 2026-06
+> Release: Winter '27 | API: v68.0 | Updated: 2026-09
 > Source: Stable Salesforce standard-object schema (not version-specific). These are common AI mistakes; confirm exact field/relationship names in the org's Object Manager or the SOAP API Object Reference.
 
 ---

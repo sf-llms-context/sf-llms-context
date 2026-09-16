@@ -1,7 +1,7 @@
 # sf-llms-context
 
 > Curated Salesforce knowledge for AI coding agents. Prevents LLMs from generating deprecated patterns.
-> Current: Summer '26 | API v67.0
+> Current: Winter '27 | API v68.0
 
 ## Core — Read These First
 
@@ -21,13 +21,13 @@
 
 ## API
 
-- [API Versions](api/versions.md): Current version (v67.0), release-to-version map, retired versions, and using the current version on new metadata
+- [API Versions](api/versions.md): Current version (v68.0), release-to-version map, retired versions, and using the current version on new metadata
 - [REST API](api/rest-api.md): OAuth, versioned endpoints, query pagination, and Composite/Collections instead of one call per record
 - [Bulk API 2.0](api/bulk-api.md): When to use Bulk vs REST, ingest/query job lifecycle, CSV, polling, and result handling
 
 ## Releases
 
-- [Summer '26 (current)](releases/current.md): Secure-by-default Apex on v67.0 (User Mode + with sharing), API retirements, and key Apex/LWC changes
+- [Winter '27 (current)](releases/current.md): Higher Apex heap limits, complex template expressions GA in LWC, asynchronous sharing recalculation, and API retirements
 
 ## Full Context
 

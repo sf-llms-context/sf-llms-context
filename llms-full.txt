@@ -1,7 +1,7 @@
 # Deprecated Salesforce Patterns — Do NOT Generate These
 
 > AI: Read this file FIRST before generating any Salesforce code. Every pattern here is wrong. Use the GOOD alternative instead.
-> Release: Summer '26 | API: v67.0 | Updated: 2026-06
+> Release: Winter '27 | API: v68.0 | Updated: 2026-09
 
 ---
 
@@ -324,25 +324,23 @@ export default class MyComponent extends LightningElement {
 ```
 - WHY: Aura is in maintenance mode. LWC is faster, uses web standards, and is the only actively developed component framework.
 
-### Template expressions with JS logic
+### Template expressions in components below LWC API v68.0
 
 - BAD:
 ```html
+<!-- component's .js-meta.xml declares <apiVersion>67.0</apiVersion> -->
 <template>
     <p>{count + 1}</p>
     <p>{items.length > 0 ? 'Has items' : 'Empty'}</p>
 </template>
 ```
 - GOOD:
-```html
-<template>
-    <p>{nextCount}</p>
-    <template lwc:if={hasItems}>
-        <p>Has items</p>
-    </template>
-</template>
+```xml
+<!-- either raise the component to v68.0 in its .js-meta.xml ... -->
+<apiVersion>68.0</apiVersion>
 ```
 ```javascript
+// ... or keep the component on an older API version and use a getter
 get nextCount() {
     return this.count + 1;
 }
@@ -350,7 +348,7 @@ get hasItems() {
     return this.items.length > 0;
 }
 ```
-- WHY: LWC templates don't support JavaScript expressions. Use getter properties in the JS class.
+- WHY: complex template expressions went GA in Winter '27 and require LWC API v68.0. Below that version the template does not compile. Getters still read better for anything beyond a short expression, so do not convert working getters to expressions just because the syntax is now allowed.
 
 ### Direct DOM manipulation
 
@@ -424,6 +422,22 @@ import { gql, graphql } from 'lightning/uiGraphQLApi';
 import { gql, graphql } from 'lightning/graphql';
 ```
 - WHY: `lightning/graphql` supersedes `lightning/uiGraphQLApi` since Winter '26 (API v65.0). The new module supports optional fields (inaccessible fields are omitted instead of failing), dynamic queries with string interpolation, and mutations (GA in Spring '26).
+
+### window.open for same-origin URLs (Aura under LWS)
+
+- BAD:
+```javascript
+window.open(url, '_blank');
+```
+- GOOD:
+```javascript
+const link = document.createElement('a');
+link.href = url;
+link.target = '_blank';
+link.rel = 'noopener';
+link.click();
+```
+- WHY: from Winter '27, programmatically opening a same-origin URL in a new tab via `window.open(url, '_blank')` throws a `LockerSecurityError` under Lightning Web Security for Aura. A detached programmatic anchor click handles same-origin navigation and downloads safely.
 
 ---
 
@@ -539,9 +553,9 @@ for (Account acc : accounts) {
 
 ### Outdated API versions
 
-- BAD: Using API version below v67.0 in any new code, metadata, or integration.
-- GOOD: Use API version v67.0 (Summer '26) for all new work.
-- WHY: API versions 21.0–30.0 are already retired (calls fail); 31.0–40.0 are deprecated in Summer '27 and retired in Summer '28. Old API versions also miss the v67.0 security model (User Mode by default, sharing by default) and other fixes. See api/versions.md for the full schedule.
+- BAD: Using API version below v68.0 in any new code, metadata, or integration.
+- GOOD: Use API version v68.0 (Winter '27) for all new work.
+- WHY: API versions 21.0–30.0 are already retired (calls fail); 31.0–40.0 are deprecated in Summer '27 and retired in Summer '28. Apex saved at API versions 9.0–19.0 now raises a compiler warning and is scheduled for retirement. Old API versions also miss the v67.0 security model (User Mode by default, sharing by default) and other fixes. See api/versions.md for the full schedule.
 
 ### SOAP API for new integrations
 
@@ -565,13 +579,19 @@ for (Account acc : accounts) {
 
 - BAD: Creating or using Standard Volume Platform Events.
 - GOOD: Use High Volume Platform Events. Migrate existing ones with the Salesforce migration tool (Tooling API or Metadata API).
-- WHY: Standard Volume Platform Events are no longer supported starting Winter '27. Migrate before then — unmigrated events will stop working.
+- WHY: Standard volume platform events are retired on **December 15, 2026**. Migrate before then — unmigrated events will stop working. Setup offers a one-click migration to high volume platform events.
 
 ### OAuth 2.0 username-password flow
 
 - BAD: Using the OAuth 2.0 username-password flow for Connected App integrations.
 - GOOD: Use the OAuth 2.0 web-server flow (authorization code) or client credentials flow.
-- WHY: Username-password flow is being retired in Winter '27. It bypasses MFA and is a security risk.
+- WHY: Enforcement was postponed from Winter '27 to **February 20, 2027**. The flow passes credentials directly in HTTP requests. Orgs created in Summer '26 and later already have it blocked and cannot re-enable it. For end-user login use the web-server flow with PKCE.
+
+### Salesforce Functions
+
+- BAD: Building new functionality on Salesforce Functions.
+- GOOD: Deploy an alternative before the existing order term ends — Heroku, an external service, or Apex where the work fits platform limits.
+- WHY: Salesforce Functions is no longer available for purchase or renewal and is being retired. Existing subscriptions run only to the end of their current order term.
 
 ### Salesforce to Salesforce
 
@@ -603,8 +623,8 @@ for (Account acc : accounts) {
 # Salesforce Governor Limits — Current Numbers
 
 > AI: Reference these numbers when generating Apex code. Never hardcode values that exceed these limits. When in doubt, add LIMIT clauses and bulkify.
-> Release: Summer '26 | API: v67.0 | Updated: 2026-06
-> Source: Verified against Salesforce Apex Developer Guide and Salesforce Developer Limits and Allocations Quick Reference (Summer '26, last updated May 8, 2026). Cursor limits added in Spring '26 (API v66.0). No core limit numbers have changed since Summer '25.
+> Release: Winter '27 | API: v68.0 | Updated: 2026-09
+> Source: Verified against the Apex Developer Guide, Platform Events Developer Guide, Change Data Capture Developer Guide, and Bulk API 2.0 Developer Guide (all "Version 68.0, Winter '27"), the Salesforce Limits and Allocations Quick Reference, and the Winter '27 Release Notes (August 31, 2026). Winter '27 raised the Apex heap limits; the callout size cap did not move with them. No other core limit numbers changed. Pub/Sub API allocations verified against the "Pub/Sub API and Event Allocations" documentation page.
 
 ---
 
@@ -627,7 +647,7 @@ This table lists synchronous and asynchronous limits. Async = Batch Apex, Queuea
 | @future methods invoked | 50 | 0 in batch/future; 50 in queueable |
 | Queueable jobs enqueued (System.enqueueJob) | 50 | 1 |
 | sendEmail invocations | 10 | 10 |
-| Heap size | 6 MB | 12 MB |
+| Heap size | 10 MB | 25 MB |
 | CPU time | 10,000 ms | 60,000 ms |
 | Max transaction execution time | 10 minutes | 10 minutes |
 | Push notification method calls | 10 | 10 |
@@ -635,7 +655,8 @@ This table lists synchronous and asynchronous limits. Async = Batch Apex, Queuea
 | EventBus.publish (publish immediately) | 150 | 150 |
 
 Notes:
-- Email services heap size: **50 MB** (override of the 6 MB sync heap for email services).
+- **Heap increased in Winter '27 (v68.0)**: sync 6 MB to 10 MB, async 12 MB to 25 MB. Rolled out automatically on the Winter '27 schedule; Spring '27 enforces the higher limits globally. Nonproduction orgs can temporarily keep the old limits via Setup > Apex Settings > *Enforce the Summer '26 Apex heap limit*. Confirm the org's actual value with `Limits.getLimitHeapSize()` rather than assuming.
+- Email services heap size: **50 MB** (override of the 10 MB sync heap for email services).
 - "Describes" no longer has a hard per-transaction limit — describe operations are cached and don't count.
 - Scheduled Apex uses synchronous limits despite being async-launched.
 - For Bulk API/Bulk API 2.0 transactions, the effective limit is the higher of the sync/async values.
@@ -656,7 +677,7 @@ Cursors are tracked separately from regular SOQL — they have their own row and
 | Rows across all pagination cursors per transaction | 100,000 | 100,000 |
 | Rows per page from a pagination cursor | 2,000 | 2,000 |
 
-**Elastic Limits (Beta, Summer '26):** Orgs can enable elastic limits for Queueable and @future jobs. The elastic limit is 2× the org's licensed daily async job limit (capped at +10M executions). Jobs exceeding the licensed limit are throttled instead of failing.
+**Elastic Limits (Beta, Summer '26; Batch jobs added in Winter '27):** Orgs can enable elastic limits for Queueable, @future, and — as of Winter '27 — Batch jobs. The elastic limit is 2× the org's licensed daily async job limit (capped at +10M executions). Jobs exceeding the licensed limit are throttled instead of failing; for Batch specifically, in-flight jobs are slowed and new Batch jobs are limited to 1 active job at a time. Enable it in Setup > Apex Settings > *Use elastic limits for asynchronous Apex jobs (beta)*. Beta — do not design a production process that depends on it.
 
 ## Batch Apex Limits
 
@@ -702,6 +723,7 @@ Common allocations (per org, by edition):
 | Max Process Builder + Flow subscribers per platform event | 4,000 | 4,000 | 4,000 | 5 |
 | Max **active** PB + Flow subscribers per platform event | 2,000 | 2,000 | 2,000 | 5 |
 | Max custom channels for Platform Events (excl. Real-Time Event Monitoring) | 100 | 100 | 100 | 100 |
+| Max custom channels for Change Data Capture events | 100 | 100 | 100 | 100 |
 | Max custom channels for Real-Time Event Monitoring | 3 | 3 | 3 | 3 |
 | Max distinct custom platform events per channel (channel members) | 50 | 50 | 5 | 5 |
 | Max Real-Time Event Monitoring events per channel | 10 | 10 | 10 | 10 |
@@ -728,11 +750,15 @@ Notes:
 | Max event message size | 1 MB |
 | Max recommended batch in a `PublishRequest` | 3 MB (gRPC hard cap is 4 MB) |
 | Recommended events per publish request | ≤ 200 |
-| Max events per `FetchRequest` / `ManagedFetchRequest` | 100 |
-| Max managed subscriptions per org | 200 |
+| Max events requested across all `FetchRequest` / `ManagedFetchRequest` in one Subscribe call | 100 |
+| Max unique managed subscriptions per org (ManagedSubscribe is Beta) | 200 |
 | gRPC concurrent streams per channel | 1,000 (HTTP/2 underlying connection) |
 
-Note: Pub/Sub API is the recommended subscription channel for new integrations. CometD remains supported but is in maintenance mode.
+Notes:
+- The 100-event cap is **across all fetch requests in a Subscribe call**, not per request. Asking for more is silently clamped to 100 — the server does not error.
+- A `PublishRequest` over 4 MB fails the whole call with a gRPC `UNAVAILABLE` error and the server closes the stream. An individual event over 1 MB fails only its own `PublishResult`; the rest of the batch still publishes.
+- Event delivery allocations are not Pub/Sub's own — the platform event and Change Data Capture delivery allocations above apply.
+- Pub/Sub API is the recommended subscription channel for new integrations. CometD remains supported but is in maintenance mode.
 
 ## Change Data Capture
 
@@ -749,7 +775,7 @@ Per org, by edition:
 
 Notes:
 - **No publishing limit** for CDC — Salesforce generates change events from record DML, not user-published.
-- 5-entity limit applies to selections you make and selections by unmanaged/managed packages (except AppExchange-released managed packages).
+- 5-entity limit applies to selections you make and selections by unmanaged/managed packages (except AppExchange-released managed packages). An entity selected in several channels counts once.
 - Multiple DML on the same record in the same transaction produce **one** change event with the committed final state, not one per DML.
 - Use custom channels with stream filtering to reduce delivery allocation usage.
 - If a change event exceeds 1 MB, a **gap event** is published instead.
@@ -781,6 +807,7 @@ Note: The Bulk API has no explicit "concurrent jobs" cap. Throughput is governed
 | Limit | Value |
 |---|---|
 | Composite Batch subrequests | 25 per call |
+| Composite Batch — sObject Collections or query subrequests | 5 of the 25 |
 | Composite Batch timeout | 10 minutes |
 | Composite Graph total nodes per payload | 500 |
 | Composite Graph graphs per payload | 75 |
@@ -828,6 +855,8 @@ Daily API call allocation per edition (`Total Calls Per 24-Hour Period`):
 |---|---|
 | Default callout timeout | 10 seconds (max 120s per `setTimeout`) |
 | Max callout request/response size | 6 MB (sync) / 12 MB (async) |
+| Apex trigger batch size | 200 (2,000 for platform events and CDC) |
+| For loop list batch size | 200 |
 | Max SOQL query runtime before cancel | 120 seconds |
 | Max class + trigger code units per deployment | 7,500 |
 | Max characters per class | 1,000,000 |
@@ -837,6 +866,8 @@ Daily API call allocation per edition (`Total Calls Per 24-Hour Period`):
 | Batch Apex QueryLocator max rows | 50,000,000 |
 | Daily test classes queued (production) | greater of 500 or 10 × test class count |
 | Daily test classes queued (sandbox/DE) | greater of 500 or 20 × test class count |
+
+**The callout size cap did not move with the heap increase.** Winter '27 raised heap to 10 MB / 25 MB, but the maximum callout request or response stayed at 6 MB sync / 12 MB async. Request and response sizes still count against heap.
 
 Notes:
 - Org-wide 6 MB code limit excludes managed packages (1GP/2GP) and `@isTest` classes. Increase via support case.
@@ -870,7 +901,7 @@ Flows execute inside an Apex transaction and inherit per-transaction Apex govern
 | Records retrieved by SOQL | Same as Apex (50,000) | inherited |
 | Records processed by DML | Same as Apex (10,000) | inherited |
 | CPU time per transaction | Same as Apex (10,000 ms sync / 60,000 ms async) | inherited |
-| Heap size | Same as Apex (6 MB sync / 12 MB async) | inherited |
+| Heap size | Same as Apex (10 MB sync / 25 MB async) | inherited |
 | Max flow interview size | 1,000,000 bytes (~1 MB) | multi-source |
 | Duplicate updates per batch | 12 | Trailhead "Avoid Flow Limits" |
 
@@ -905,11 +936,11 @@ These are the limits AI-generated code violates most frequently:
 2. **DML 150 statement limit** — Don't DML inside loops.
 3. **CPU 10s limit** — Watch nested loops and complex string operations.
 4. **50,000 row limit** — Always add WHERE clauses and LIMIT.
-5. **Heap 6MB limit** — Don't load large datasets into memory. Use Batch Apex for large volumes.
+5. **Heap 10MB limit** — Do not load large datasets into memory. Use Batch Apex for large volumes.
 # Apex Best Practices — Current Patterns
 
-> AI: Use these patterns when generating Apex code. These are the current recommended approaches for Summer '26.
-> Release: Summer '26 | API: v67.0 | Updated: 2026-06
+> AI: Use these patterns when generating Apex code. These are the current recommended approaches for Winter '27.
+> Release: Winter '27 | API: v68.0 | Updated: 2026-09
 
 ---
 
@@ -1201,7 +1232,14 @@ Always wrap the method under test in `Test.startTest()` / `Test.stopTest()` to g
 
 ---
 
-## Security — Access Modes (Summer '26 / API v67.0)
+### Integration tests against real endpoints (Developer Preview, Winter '27)
+
+Apex integration tests can call real HTTP endpoints, including external service endpoints, without mock callouts. They relax callout restrictions and transaction rollback semantics, so they assert on real side effects. `@BeforeClass` sets up test data shared across methods in an integration test class.
+
+- Scratch orgs only, developer preview — not a replacement for `HttpCalloutMock` in a regular test suite.
+- Regular unit tests must still mock. A test that hits a live endpoint is not deterministic and does not belong in a deploy gate.
+
+## Security — Access Modes (default since Summer '26 / API v67.0)
 
 Since API v67.0, database operations run in **User Mode by default** — they enforce the current user's CRUD, FLS, and sharing. In v66.0 and earlier, they default to System Mode.
 
@@ -1264,6 +1302,8 @@ public inherited sharing class UtilityClass { /* inherits from caller */ }
 Since API v67.0, classes without an explicit sharing declaration default to `with sharing`. Always declare it explicitly to avoid behavior changes on API version upgrade.
 
 ---
+
+**Sharing recalculation is partly asynchronous (Release Update, enforced from Spring '26 onward).** After large-scale group or role changes, Salesforce recalculates some shares asynchronously. Apex, triggers, tests, and flows that update group membership or roles and then immediately read the resulting share records can break. Do not assume a share exists in the same transaction that caused it — re-query, or move the dependent work to an async step.
 
 ## Custom Metadata Types for Configuration
 
@@ -1383,7 +1423,7 @@ Use `String.template()` with named `${variable}` placeholders instead of `String
 # LWC Best Practices — Current Patterns
 
 > AI: Use these patterns when generating Lightning Web Components. Default to Lightning Data Service over imperative Apex, use the modern `lwc:if`/`lwc:ref` syntax, and respect Lightning Web Security.
-> Release: Summer '26 | API: v67.0 | Updated: 2026-06
+> Release: Winter '27 | API: v68.0 | Updated: 2026-09
 
 ---
 
@@ -1533,6 +1573,41 @@ Use the modern directives. `if:true` / `if:false` were deprecated in v59.0 (Wint
     <div>{content}</div>
 </template>
 ```
+
+---
+
+## Template Expressions (GA in Winter '27, requires LWC API v68.0)
+
+Complex JavaScript expressions are allowed directly in the template, anywhere a basic property is allowed.
+
+```html
+<template>
+    <p>{count + 1}</p>
+    <p>{user.firstName + ' ' + user.lastName}</p>
+</template>
+```
+
+Rules:
+
+- Requires `<apiVersion>68.0</apiVersion>` in the component's `.js-meta.xml`. Below v68.0 the template does not compile.
+- Keep expressions short. A getter is still the better home for anything with branching, a loop, or a non-obvious name — the expression syntax removes boilerplate, it does not replace readable code.
+- Do not rewrite existing working getters into expressions; there is no runtime benefit.
+
+---
+
+## Third-Party Web Components — `lwc:external` (GA in Winter '27)
+
+Render a third-party custom element natively instead of rewriting it as an LWC.
+
+```html
+<template>
+    <my-chart lwc:external data-id="revenue"></my-chart>
+</template>
+```
+
+- The component must be registered as a real custom element before use (for example from a static resource loaded in `connectedCallback`).
+- Without `lwc:external`, LWC treats an unknown tag as a compile error.
+- The element still runs under Lightning Web Security — check the library for `window`-level global access.
 
 ---
 
@@ -1724,6 +1799,8 @@ async handleSave() {
 
 `updateRecord` already invalidates LDS cache for that record — you only need `getRecordNotifyChange` when the change happened outside LDS (Apex callout, external system, custom action).
 
+**State managers (Winter '27):** call `refresh()` on a built-in state manager to refetch list- or query-shaped data (related list records, for example) without reconfiguring the state manager or reloading the page. Use it instead of forcing a full page refresh when only the collection went stale.
+
 ---
 
 ## Navigation
@@ -1863,10 +1940,12 @@ External libraries must run under **Lightning Web Security** (replaced Locker Se
 | Toast in Lightning Out app | Toasts only work in LEX / Salesforce mobile |
 | Forgetting `key={item.Id}` in `for:each` | Always provide a unique stable key |
 | Importing fields as strings: `fields: ['Account.Name']` | Use `@salesforce/schema/Account.Name` imports |
+| Template expression in a component below API v68.0 | Raise `apiVersion` to 68.0 or use a getter |
+| `window.open(url, '_blank')` for a same-origin URL | Detached anchor click — `window.open` throws `LockerSecurityError` under LWS for Aura |
 # SOQL Best Practices — Current Patterns
 
 > AI: Use these patterns when generating SOQL queries (Apex, LWC `@wire`, REST, Bulk API). Focus on selectivity, bulkification, and the User Mode security model introduced in v67.0.
-> Release: Summer '26 | API: v67.0 | Updated: 2026-06
+> Release: Winter '27 | API: v68.0 | Updated: 2026-09
 
 ---
 
@@ -1907,7 +1986,7 @@ A query is **selective** when its WHERE clause filters on an indexed field that 
 
 ### Check selectivity with the Query Plan tool
 
-Use **Developer Console → Query Editor → Query Plan** (or REST API `/services/data/v67.0/query/?explain=...`) to see cost. Cost > 1.0 = not selective.
+Use **Developer Console → Query Editor → Query Plan** (or REST API `/services/data/v68.0/query/?explain=...`) to see cost. Cost > 1.0 = not selective.
 
 ---
 
@@ -2258,6 +2337,36 @@ SOSL limits per transaction: 20 queries, 2,000 rows per query.
 
 ---
 
+## FORMULA() in WHERE (Beta, Winter '27, API v68.0+)
+
+Compare two fields arithmetically in the WHERE clause without a formula field or post-processing.
+
+```sql
+SELECT Id, Name
+FROM Opportunity
+WHERE FORMULA(Amount - Expected_Revenue__c) > 0
+```
+
+**Do not put this in production code.** The beta runs only in sandbox, Developer Edition, and scratch orgs on API v68.0 and later; it is not available in production orgs. Until it goes GA, a formula field or Apex post-processing remains the only production-safe way to compare fields.
+
+---
+
+## SET OPTIONS (Managed Package Namespaces)
+
+```apex
+Database.QueryOptions opts = new Database.QueryOptions();
+opts.explicitNamespace = 'myNamespace';
+List<SObject> rows = Database.queryWithBinds(
+    'SELECT Id, My_Field__c FROM Account SET OPTIONS :opts',
+    new Map<String, Object>{ 'opts' => opts },
+    AccessLevel.USER_MODE
+);
+```
+
+Only relevant to managed package code: when a package field and a subscriber's custom field share a name, Apex otherwise treats both as belonging to the package namespace and the query fails the unique-field-name rule enforced since API v34.0. Setting `explicitNamespace` resolves the conflict. Not needed in org-local code.
+
+---
+
 ## Common AI-Generated Mistakes
 
 | Mistake | Fix |
@@ -2270,10 +2379,11 @@ SOSL limits per transaction: 20 queries, 2,000 rows per query.
 | Filtering on formula fields | Add a custom indexed field or restructure the data model |
 | `ORDER BY` without indexed field | Sort in Apex after query, or index the sort field |
 | String concat for dynamic SOQL | Use `Database.queryWithBinds` with a binds map |
+| `FORMULA()` in production code | Beta, sandbox/DE/scratch only — use a formula field in production |
 # Flow Best Practices — Current Patterns
 
 > AI: Use these patterns when designing Flow Builder automations. Flow is the only declarative automation tool — Workflow Rules and Process Builder are retired.
-> Release: Summer '26 | API: v67.0 | Updated: 2026-06
+> Release: Winter '27 | API: v68.0 | Updated: 2026-09
 
 ---
 
@@ -2461,6 +2571,10 @@ Order of execution (relevant portions):
 
 ---
 
+**Sharing recalculation is partly asynchronous** (Release Update, from Spring '26). A flow that changes group membership or roles and then reads the resulting share records in the same run can break. Re-query later or move the dependent step to an async path.
+
+---
+
 ## When to Use Flow vs Apex
 
 | Use Flow when | Use Apex when |
@@ -2550,6 +2664,7 @@ Always fill the **Description** field on the flow and on each element. Future-yo
 
 - **Debug runs** — built-in. Provide sample record IDs and see element-by-element execution.
 - **Flow Tests** (GA Winter '23) — declarative test cases stored with the flow. Cover positive paths, negative paths, and edge cases.
+- **Flow Test Mode** (Beta, Winter '27) — debug and save reusable test scenarios, and supply mock outputs for Action and Subflow elements so a flow can be tested in isolation. Beta — use it to shorten the debug loop, not as the only gate before a deploy.
 - **Salesforce DevOps Center** — version control and deployment for flows.
 
 ---
@@ -2587,7 +2702,7 @@ Convert to **Scheduled Paths** in a Record-Triggered Flow.
 # Salesforce Standard Objects — What AI Gets Wrong
 
 > AI: Read this before generating SOQL, DML, or schema code against standard objects. The API name, relationship, or field you assume is often not the real one. Verify against the org's Object Manager when unsure.
-> Release: Summer '26 | API: v67.0 | Updated: 2026-06
+> Release: Winter '27 | API: v68.0 | Updated: 2026-09
 > Source: Stable Salesforce standard-object schema (not version-specific). These are common AI mistakes; confirm exact field/relationship names in the org's Object Manager or the SOAP API Object Reference.
 
 ---
@@ -2655,17 +2770,17 @@ The label and the API name differ for several core objects. Querying the label f
 - **RecordTypeId:** present on most standard objects; filter and set it by the record type's developer name, not its label.
 # Salesforce API Versions — Current and Retired
 
-> AI: Use the current API version (v67.0) on all new metadata — Apex classes, triggers, LWC, flows, and REST/SOAP/Bulk endpoint paths. Never emit a version from the v50s or lower on new code. When updating existing metadata, do not silently downgrade its version.
-> Release: Summer '26 | API: v67.0 | Updated: 2026-06
-> Source: Verified against Salesforce REST API Developer Guide, Apex Developer Guide, and Bulk API 2.0 Developer Guide (all Summer '26, "Version 67.0, Summer '26"). Retirement schedule from the REST API guide's "Understand API Version Retirement" and the Summer '26 release notes.
+> AI: Use the current API version (v68.0) on all new metadata — Apex classes, triggers, LWC, flows, and REST/SOAP/Bulk endpoint paths. Never emit a version from the v50s or lower on new code. When updating existing metadata, do not silently downgrade its version.
+> Release: Winter '27 | API: v68.0 | Updated: 2026-09
+> Source: Verified against the Salesforce REST API, Apex, and Bulk API 2.0 Developer Guides (all "Version 68.0, Winter '27") and the Winter '27 Release Notes (August 31, 2026). Retirement schedule from the REST API guide's "Understand API Version Retirement" and the Winter '27 release notes.
 
 ---
 
 ## Current version
 
-- **v67.0 — Summer '26.** Use this for every new component and every REST/SOAP/Bulk endpoint path.
-- Endpoint example: `/services/data/v67.0/sobjects/Account/`
-- Next version: **v68.0 — Winter '27** (GA ~Oct 2026).
+- **v68.0 — Winter '27.** Use this for every new component and every REST/SOAP/Bulk endpoint path.
+- Endpoint example: `/services/data/v68.0/sobjects/Account/`
+- Next version: **v69.0 — Spring '27**.
 
 ## Release-to-version map
 
@@ -2673,7 +2788,8 @@ Salesforce ships 3 releases/year (Spring, Summer, Winter) and increments the API
 
 | Release | API version |
 |---|---|
-| Summer '26 | v67.0 (current) |
+| Winter '27 | v68.0 (current) |
+| Summer '26 | v67.0 |
 | Spring '26 | v66.0 |
 | Winter '26 | v65.0 |
 | Summer '25 | v64.0 |
@@ -2684,7 +2800,7 @@ Salesforce ships 3 releases/year (Spring, Summer, Winter) and increments the API
 | Winter '24 | v59.0 |
 | Summer '23 | v58.0 |
 
-Anchors v58.0 (Summer '23) and v67.0 (Summer '26) are confirmed in the official guides; the cadence is a fixed +1 per release with no skipped versions.
+Anchors v58.0 (Summer '23) and v68.0 (Winter '27) are confirmed in the official guides and release notes; the cadence is a fixed +1 per release with no skipped versions.
 
 ## Retired and deprecated versions
 
@@ -2692,6 +2808,8 @@ Anchors v58.0 (Summer '23) and v67.0 (Summer '26) are confirmed in the official 
 - **v21.0 through v30.0 — RETIRED** as of Summer '25. Calls fail.
 - **v31.0 through v40.0 — being retired** (announced Summer '26): deprecated in **Summer '27** (no more security updates or bug fixes), retired in **Summer '28** (REST, SOAP, and Bulk calls to these versions fail). Upgrade integrations now.
 - **SOAP `login()` in v31.0 through v64.0 — being retired in Summer '27** (Release Update). This is the SOAP login call specifically — move SOAP logins to OAuth. Separate from the v31.0–v40.0 platform retirement above.
+- **Apex saved at v9.0 through v19.0 — compiler warning as of Winter '27**, retirement announced for a future release. Saving or recompiling such a class returns `Apex API version {XX} is scheduled for retirement.` Raise the class or trigger's API version.
+- **`showAllMethods` (Test Discovery API) is deprecated in v68.0+** — replaced by the `testLevel` query parameter. `showAllMethods` works only on v67.0 and earlier.
 - General rule: API versions more than ~3 years old may stop being supported. Plan to keep metadata current.
 
 ### Detecting a deprecated version at runtime
@@ -2718,7 +2836,7 @@ Anchors v58.0 (Summer '23) and v67.0 (Summer '26) are confirmed in the official 
 ### Hardcoded endpoint paths must use the current version
 
 - BAD: `callout:MyOrg/services/data/v49.0/query?q=...`
-- GOOD: `callout:MyOrg/services/data/v67.0/query?q=...`
+- GOOD: `callout:MyOrg/services/data/v68.0/query?q=...`
 - WHY: the path version pins the API contract; a retired version (≤ v30.0) makes the callout fail outright.
 
 ### LWC API version controls framework behavior
@@ -2727,15 +2845,15 @@ Anchors v58.0 (Summer '23) and v67.0 (Summer '26) are confirmed in the official 
 - WHY: setting a new component below 59.0 silently opts it out of current LWC engine behavior — set new components to 67.0.
 # Salesforce REST API — Current Patterns
 
-> AI: Use these patterns when generating REST API integrations against Salesforce. Always use the current version path (v67.0), OAuth 2.0, and a Composite/Collections resource instead of one HTTP call per record. For limit numbers, see limits/governor-limits.md.
-> Release: Summer '26 | API: v67.0 | Updated: 2026-06
-> Source: Verified against Salesforce REST API Developer Guide (Summer '26, "Version 67.0, Summer '26"). Resource names and limits confirmed in the guide. Limit numbers live in limits/governor-limits.md.
+> AI: Use these patterns when generating REST API integrations against Salesforce. Always use the current version path (v68.0), OAuth 2.0, and a Composite/Collections resource instead of one HTTP call per record. For limit numbers, see limits/governor-limits.md.
+> Release: Winter '27 | API: v68.0 | Updated: 2026-09
+> Source: Verified against the Salesforce REST API Developer Guide ("Version 68.0, Winter '27"). Composite resource caps, subrequest rules, and commit semantics confirmed in the guide. Limit numbers live in limits/governor-limits.md.
 
 ---
 
 ## Base path and auth
 
-- Append the version path to your org's My Domain host (`*.my.salesforce.com`): `/services/data/v67.0/`
+- Append the version path to your org's My Domain host (`*.my.salesforce.com`): `/services/data/v68.0/`
 - Always pin the version in the path. A retired version (≤ v30.0) makes the call fail — see api/versions.md.
 - Auth: OAuth 2.0 bearer token in the `Authorization: Bearer <token>` header.
 
@@ -2751,12 +2869,12 @@ Anchors v58.0 (Summer '23) and v67.0 (Summer '26) are confirmed in the official 
 
 - BAD:
 ```
-GET /services/data/v67.0/query?q=SELECT+Id+FROM+Contact
+GET /services/data/v68.0/query?q=SELECT+Id+FROM+Contact
 // ...then process only response.records and stop
 ```
 - GOOD:
 ```
-GET /services/data/v67.0/query?q=SELECT+Id+FROM+Contact
+GET /services/data/v68.0/query?q=SELECT+Id+FROM+Contact
 // loop while response.done == false:
 GET <response.nextRecordsUrl>
 ```
@@ -2777,12 +2895,14 @@ One HTTP call per record burns the org's API allocation and is slow. Use the rig
 
 (See limits/governor-limits.md for the full Composite/Graph/Tree limit table.)
 
+`/composite/batch` has no shared transaction and no rollback: subrequests execute serially, each commits on success, and a later failure does **not** roll back what earlier subrequests already committed. It also allows at most 5 sObject Collections or query subrequests among the 25, and times out after 10 minutes. When partial commits are unacceptable, use `/composite` with `allOrNone`, or `/composite/graph`, which rolls back per graph.
+
 ### Insert/update many records in one call
 
 - BAD: a loop issuing `POST /sobjects/Contact/` once per Contact.
 - GOOD:
 ```
-POST /services/data/v67.0/composite/sobjects
+POST /services/data/v68.0/composite/sobjects
 {
   "allOrNone": true,
   "records": [
@@ -2804,9 +2924,9 @@ POST /services/data/v67.0/composite/sobjects
 - REST sync calls have short concurrency caps for requests over 20s (see governor-limits) — long-running jobs belong in Bulk.
 # Salesforce Bulk API 2.0 — Current Patterns
 
-> AI: Use Bulk API 2.0 (not Bulk API 1.0) for large data volumes. Generate the full job lifecycle — create, upload CSV, close, poll, fetch results. Use the current version path (v67.0). For limit numbers, see limits/governor-limits.md.
-> Release: Summer '26 | API: v67.0 | Updated: 2026-06
-> Source: Verified against Salesforce Bulk API 2.0 and Bulk API Developer Guide (Summer '26, "Version 67.0, Summer '26"). Endpoints, job states, and CSV requirements confirmed in the guide. Limit numbers live in limits/governor-limits.md.
+> AI: Use Bulk API 2.0 (not Bulk API 1.0) for large data volumes. Generate the full job lifecycle — create, upload CSV, close, poll, fetch results. Use the current version path (v68.0). For limit numbers, see limits/governor-limits.md.
+> Release: Winter '27 | API: v68.0 | Updated: 2026-09
+> Source: Verified against the Salesforce Bulk API 2.0 and Bulk API Developer Guide ("Version 68.0, Winter '27"). Endpoints, job states, CSV requirements, and the 150 MB / 150,000,000 record allocations confirmed in the guide. Limit numbers live in limits/governor-limits.md.
 
 ---
 
@@ -2827,18 +2947,18 @@ POST /services/data/v67.0/composite/sobjects
 CSV is the only supported format.
 
 ```
-1. POST /services/data/v67.0/jobs/ingest
+1. POST /services/data/v68.0/jobs/ingest
    { "object": "Contact", "operation": "insert", "contentType": "CSV" }
    -> response: job id, state "Open", contentUrl
 
-2. PUT  /services/data/v67.0/jobs/ingest/{jobId}/batches
+2. PUT  /services/data/v68.0/jobs/ingest/{jobId}/batches
    Content-Type: text/csv
    <CSV data>
 
-3. PATCH /services/data/v67.0/jobs/ingest/{jobId}
+3. PATCH /services/data/v68.0/jobs/ingest/{jobId}
    { "state": "UploadComplete" }
 
-4. Poll GET /services/data/v67.0/jobs/ingest/{jobId}
+4. Poll GET /services/data/v68.0/jobs/ingest/{jobId}
    state moves: UploadComplete -> InProgress -> JobComplete (or Failed/Aborted)
 
 5. GET .../jobs/ingest/{jobId}/successfulResults
@@ -2859,13 +2979,13 @@ CSV is the only supported format.
 ## Query jobs (bulk extract)
 
 ```
-1. POST /services/data/v67.0/jobs/query
+1. POST /services/data/v68.0/jobs/query
    { "operation": "query", "query": "SELECT Id, Name FROM Account" }
    // use "queryAll" to include deleted/archived rows
 
-2. Poll GET /services/data/v67.0/jobs/query/{jobId} until state JobComplete
+2. Poll GET /services/data/v68.0/jobs/query/{jobId} until state JobComplete
 
-3. GET /services/data/v67.0/jobs/query/{jobId}/results
+3. GET /services/data/v68.0/jobs/query/{jobId}/results
    // follow the Sforce-Locator header for paging until it is "null"
 ```
 
@@ -2880,44 +3000,63 @@ CSV is the only supported format.
 - A job can stay `Open` up to 24h; results persist 7 days after a terminal state (see governor-limits).
 - Bulk processing has its own CPU allocation, isolated from the synchronous Apex CPU limit.
 - Bulk batches share the org's daily batch allocation with Bulk API 1.0 — see limits/governor-limits.md.
-# Salesforce Summer '26 — Developer Change Summary
+# Salesforce Winter '27 — Developer Change Summary
 
-> AI: Read this for what changed in Summer '26 (API v67.0) that affects generated code. The headline is the "secure by default" Apex model — on v67.0+, database operations run in User Mode and classes default to `with sharing`. Generate new code at v67.0.
-> Release: Summer '26 | API: v67.0 | Updated: 2026-06
-> Source: Verified against the Salesforce Summer '26 Release Notes (May 25, 2026 edition) and the Summer '26 REST/Apex/Bulk Developer Guides. Each item below is quoted or paraphrased from those documents.
+> AI: Read this for what changed in Winter '27 (API v68.0) that affects generated code. The headlines are higher Apex heap limits, complex template expressions going GA in LWC, and asynchronous sharing recalculation. Generate new code at v68.0.
+> Release: Winter '27 | API: v68.0 | Updated: 2026-09
+> Source: Verified against the Salesforce Winter '27 Release Notes (August 31, 2026), cross-checked against the Apex, REST API, Bulk API 2.0, and Platform Events Developer Guides (all "Version 68.0, Winter '27") and the Limits and Allocations Quick Reference.
 
 ---
 
-## Headline: Apex is "secure by default" on v67.0
+## Headline: higher Apex heap limits
 
-These are versioned changes — they apply to Apex **set to API version 67.0 and later**. Code at v66.0 and earlier keeps the old behavior.
+- Synchronous heap rises from **6 MB to 10 MB**; asynchronous from **12 MB to 25 MB**.
+- Enabled automatically on the Winter '27 rollout schedule. **Spring '27 enforces the higher limits globally.**
+- Nonproduction orgs can temporarily keep the old ceilings via Setup > Apex Settings > *Enforce the Summer '26 Apex heap limit* — use it when building in a Winter '27 sandbox for a Summer '26 production org.
+- Check the org's actual value with `Limits.getLimitHeapSize()` instead of assuming either number.
 
-### Database operations run in User Mode by default
+## Asynchronous sharing recalculation (Release Update)
 
-- SOQL, SOSL, DML, and `Database` methods now run in **User Mode** by default — enforcing the running user's CRUD, FLS, and sharing. In v66.0 and earlier they defaulted to System Mode.
-- To bypass security you must now be explicit: `WITH SYSTEM_MODE` / `AccessLevel.SYSTEM_MODE`.
-- For AI: a bare `[SELECT ...]` or `update records` in a v67.0 class is already User Mode. Explicit `WITH USER_MODE` / `AccessLevel.USER_MODE` is still good for clarity and for code that may run at lower versions. Never default to System Mode.
+After large-scale group or role changes, Salesforce now recalculates some shares asynchronously. Apex classes, triggers, tests, and flows that update group membership or roles and then read the resulting share records in the same transaction can break. Re-query, or move the dependent work to an async step. First available in Spring '26.
 
-### Apex classes default to `with sharing`
+## Apex
 
-- A class with no sharing declaration now defaults to **`with sharing`** (was `without sharing`, with exceptions). Still declare `with sharing` / `without sharing` / `inherited sharing` explicitly to avoid behavior changes on version upgrade.
+- **Elastic limits (beta) now cover Batch jobs**, in addition to `@future` and Queueable. Past the standard rolling 24-hour async limit, in-flight Batch jobs are throttled and new Batch jobs are capped at 1 active job. Enable in Apex Settings; beta, so do not build a production dependency on it.
+- **Integration tests against real endpoints (developer preview)** — Apex integration tests can call real HTTP endpoints without mock callouts, with relaxed callout and rollback semantics. `@BeforeClass` shares test data across methods in the class. Scratch orgs only; regular unit tests must still mock.
+- **`explicitNamespace` on `Database.QueryOptions`**, passed through the SOQL `SET OPTIONS` clause, resolves duplicate field-name errors in managed package queries when a package field and a subscriber field share a name.
+- **Apex saved at API v9.0–v19.0 now raises a compiler warning** and is scheduled for retirement in a future release.
+- **Block Apex Anonymous Code Execution from Managed Packages (Release Update)** — blocks managed package session IDs from authenticating anonymous Apex.
+- **Apex Symbol API (beta)** — Tooling API REST resource returning detailed type metadata for classes, interfaces, methods, and triggers.
 
-### WITH SECURITY_ENFORCED is removed
+## SOQL
 
-- The `WITH SECURITY_ENFORCED` SOQL clause is **removed as of API v67.0** — classes at v67.0+ that use it error. Use `WITH USER_MODE` instead.
-
-## API versions and retirements
-
-- Current version is **v67.0**. Use it for all new metadata and endpoint paths. (See api/versions.md.)
-- **Platform API v31.0–v40.0 retirement announced:** deprecated in Summer '27, retired in Summer '28 — REST, SOAP, and Bulk calls to those versions will then fail.
-- **SOAP `login()` in v31.0–v64.0** is being retired in Summer '27 (Release Update) — move SOAP logins to OAuth.
-
-## Apex language
-
-- **Multiline strings + improved string interpolation** — declare multiline strings directly and use the improved interpolation method instead of concatenation.
-- **Invocable action constructor visibility:** since API v66.0, REST calls validate that a custom Apex class used as an invocable action has an accessible no-argument constructor. A non-public/no-arg constructor causes instantiation failures — make it `public`.
+- **`FORMULA()` in the WHERE clause (beta)** — arithmetic comparison between fields without a formula field. Available only in sandbox, Developer Edition, and scratch orgs on v68.0+; **not available in production**. Keep production code on formula fields.
 
 ## LWC
 
-- **LWC API version 67.0** — set new components to 67.0 to get current framework behavior (a component at 58.0 or earlier keeps Summer '23 engine behavior).
-- **State Managers for LWC (GA)** — manage shared component state without prop-drilling or ad-hoc pub/sub.
+- **LWC API version 68.0** — set new components to 68.0 in their `.js-meta.xml`.
+- **Complex template expressions are GA** — JavaScript expressions are allowed directly in templates, anywhere a basic property is allowed. Requires v68.0; below that the template does not compile. Getters remain the better home for anything beyond a short expression.
+- **Third-party web components are GA** — render them natively with `lwc:external` instead of rewriting them as LWC.
+- **State manager `refresh()`** — refetch list- or query-shaped data from a built-in state manager without reconfiguring it or reloading the page.
+- **`window.open(url, '_blank')` on a same-origin URL throws `LockerSecurityError`** under Lightning Web Security for Aura. Use a detached programmatic anchor click.
+- **`lightning/platformNavigationItemApi`** — manage navigation items in a Lightning console app's item menu.
+
+## Flow
+
+- **Flow Test Mode (beta)** — save reusable test scenarios and supply mock outputs for Action and Subflow elements, so a flow can be tested in isolation.
+
+## API versions and retirements
+
+- Current version is **v68.0**. Use it for all new metadata and endpoint paths. (See api/versions.md.)
+- **Standard volume platform events are retired on December 15, 2026.** Migrate to high volume platform events.
+- **OAuth 2.0 username-password flow**: enforcement postponed from Winter '27 to **February 20, 2027**. Orgs created in Summer '26 and later already have it blocked.
+- **Salesforce Functions** is no longer available for purchase or renewal and is being retired; existing subscriptions run to the end of their order term.
+- **Salesforce to Salesforce** is being retired in Spring '27.
+- **Salesforce Connect cross-org adapter legacy authentication** is being retired — it depends on the SOAP `login()` call. The adapter now supports named credentials.
+- **Salesforce for Outlook** is being retired in December 2027.
+- Platform API v31.0–v40.0: deprecated in Summer '27, retired in Summer '28 (unchanged from Summer '26).
+- SOAP `login()` in v31.0–v64.0: retired in Summer '27 (unchanged from Summer '26).
+
+## Release notes structure
+
+Winter '27 moved the Development, Deployment, and Experience Cloud release notes into a single **Platform** section.
