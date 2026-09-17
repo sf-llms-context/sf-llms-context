@@ -73,15 +73,29 @@ GitHub Pages takes ~1 minute to deploy. Verify the live URLs return 200 and cont
 
 Branch as `content/<season>-<yy>` (see naming in `CLAUDE.md`), open a PR, let CI pass (markdownlint, link check, llms-full sync), then merge. After merge, re-sync Pages (step 4) and update the repo descriptions (step 6).
 
+**If the PR shows no checks at all, the workflow is switched off.** GitHub disables
+a workflow after 60 days without repository activity, and that kills every trigger
+on it — `pull_request` included, not just the weekly schedule. This repo is touched
+about three times a year, so expect it every release. Re-enable it under
+Actions → CI → **Enable workflow**, then close and reopen the PR to trigger a run;
+enabling alone does not re-run anything. Check the state with:
+
+```bash
+curl -s https://api.github.com/repos/sf-llms-context/sf-llms-context/actions/workflows \
+  | grep -o '"state": *"[^"]*"'
+```
+
+`active` is good, `disabled_inactivity` is the case above.
+
 ## 6. Update the GitHub repo descriptions
 
-Both repos carry the current release in their GitHub **description** field. That
+The main repo carries the current release in its GitHub **description** field. That
 text is repo metadata, not a file in git, so no commit updates it — it has to be
 edited in the web UI (repo → Settings → General → Description), and it is the
 first thing a visitor reads.
 
 - `sf-llms-context/sf-llms-context` — the description ends with `Current: <Season> '<yy> / API v<NN>.0.`
-- `sf-llms-context/sf-llms-context.github.io` — same check.
+- `sf-llms-context/sf-llms-context.github.io` — carries no version string today; only needs a look if that changes.
 
 ## Notes
 
