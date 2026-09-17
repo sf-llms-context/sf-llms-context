@@ -55,16 +55,16 @@ npx @sf-llms/context
 | `patterns/soql-best-practices.md` | Selective queries, bind variables, User Mode, cursors |
 | `patterns/lwc-best-practices.md` | Lightning Data Service, lwc:if/ref, custom events, LMS, GraphQL |
 | `patterns/flow-best-practices.md` | Record-Triggered Flow patterns, fault paths, subflows |
-| `limits/governor-limits.md` | Current governor limit numbers (Summer '26 / v67.0) |
+| `limits/governor-limits.md` | Current governor limit numbers (Winter '27 / v68.0) |
 | `api/rest-api.md` | REST API patterns *(Phase 3)* |
 | `api/bulk-api.md` | Bulk API 2.0 patterns *(Phase 3)* |
 | `releases/current.md` | Latest release summary *(Phase 3)* |
 
 ## Current Salesforce version
 
-- **Release:** Summer '26
-- **API version:** v67.0
-- **Next release:** Winter '27 (Oct 2026)
+- **Release:** Winter '27
+- **API version:** v68.0
+- **Next release:** Spring '27 (v69.0)
 
 ## Contributing
 
