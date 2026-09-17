@@ -71,7 +71,17 @@ GitHub Pages takes ~1 minute to deploy. Verify the live URLs return 200 and cont
 
 ## 5. PR and merge
 
-Branch as `content/<season>-<yy>` (see naming in `CLAUDE.md`), open a PR, let CI pass (markdownlint, link check, llms-full sync), then merge. Re-sync Pages (step 4) after merge.
+Branch as `content/<season>-<yy>` (see naming in `CLAUDE.md`), open a PR, let CI pass (markdownlint, link check, llms-full sync), then merge. After merge, re-sync Pages (step 4) and update the repo descriptions (step 6).
+
+## 6. Update the GitHub repo descriptions
+
+Both repos carry the current release in their GitHub **description** field. That
+text is repo metadata, not a file in git, so no commit updates it — it has to be
+edited in the web UI (repo → Settings → General → Description), and it is the
+first thing a visitor reads.
+
+- `sf-llms-context/sf-llms-context` — the description ends with `Current: <Season> '<yy> / API v<NN>.0.`
+- `sf-llms-context/sf-llms-context.github.io` — same check.
 
 ## Notes
 

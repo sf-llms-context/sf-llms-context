@@ -1,14 +1,14 @@
 # Salesforce REST API — Current Patterns
 
-> AI: Use these patterns when generating REST API integrations against Salesforce. Always use the current version path (v67.0), OAuth 2.0, and a Composite/Collections resource instead of one HTTP call per record. For limit numbers, see limits/governor-limits.md.
-> Release: Summer '26 | API: v67.0 | Updated: 2026-06
-> Source: Verified against Salesforce REST API Developer Guide (Summer '26, "Version 67.0, Summer '26"). Resource names and limits confirmed in the guide. Limit numbers live in limits/governor-limits.md.
+> AI: Use these patterns when generating REST API integrations against Salesforce. Always use the current version path (v68.0), OAuth 2.0, and a Composite/Collections resource instead of one HTTP call per record. For limit numbers, see limits/governor-limits.md.
+> Release: Winter '27 | API: v68.0 | Updated: 2026-09
+> Source: Verified against the Salesforce REST API Developer Guide ("Version 68.0, Winter '27"). Composite resource caps, subrequest rules, and commit semantics confirmed in the guide. Limit numbers live in limits/governor-limits.md.
 
 ---
 
 ## Base path and auth
 
-- Append the version path to your org's My Domain host (`*.my.salesforce.com`): `/services/data/v67.0/`
+- Append the version path to your org's My Domain host (`*.my.salesforce.com`): `/services/data/v68.0/`
 - Always pin the version in the path. A retired version (≤ v30.0) makes the call fail — see api/versions.md.
 - Auth: OAuth 2.0 bearer token in the `Authorization: Bearer <token>` header.
 
@@ -24,12 +24,12 @@
 
 - BAD:
 ```
-GET /services/data/v67.0/query?q=SELECT+Id+FROM+Contact
+GET /services/data/v68.0/query?q=SELECT+Id+FROM+Contact
 // ...then process only response.records and stop
 ```
 - GOOD:
 ```
-GET /services/data/v67.0/query?q=SELECT+Id+FROM+Contact
+GET /services/data/v68.0/query?q=SELECT+Id+FROM+Contact
 // loop while response.done == false:
 GET <response.nextRecordsUrl>
 ```
@@ -50,12 +50,14 @@ One HTTP call per record burns the org's API allocation and is slow. Use the rig
 
 (See limits/governor-limits.md for the full Composite/Graph/Tree limit table.)
 
+`/composite/batch` has no shared transaction and no rollback: subrequests execute serially, each commits on success, and a later failure does **not** roll back what earlier subrequests already committed. It also allows at most 5 sObject Collections or query subrequests among the 25, and times out after 10 minutes. When partial commits are unacceptable, use `/composite` with `allOrNone`, or `/composite/graph`, which rolls back per graph.
+
 ### Insert/update many records in one call
 
 - BAD: a loop issuing `POST /sobjects/Contact/` once per Contact.
 - GOOD:
 ```
-POST /services/data/v67.0/composite/sobjects
+POST /services/data/v68.0/composite/sobjects
 {
   "allOrNone": true,
   "records": [

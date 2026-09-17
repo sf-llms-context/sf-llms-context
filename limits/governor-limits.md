@@ -1,8 +1,8 @@
 # Salesforce Governor Limits — Current Numbers
 
 > AI: Reference these numbers when generating Apex code. Never hardcode values that exceed these limits. When in doubt, add LIMIT clauses and bulkify.
-> Release: Summer '26 | API: v67.0 | Updated: 2026-06
-> Source: Verified against Salesforce Apex Developer Guide and Salesforce Developer Limits and Allocations Quick Reference (Summer '26, last updated May 8, 2026). Cursor limits added in Spring '26 (API v66.0). No core limit numbers have changed since Summer '25.
+> Release: Winter '27 | API: v68.0 | Updated: 2026-09
+> Source: Verified against the Apex Developer Guide, Platform Events Developer Guide, Change Data Capture Developer Guide, and Bulk API 2.0 Developer Guide (all "Version 68.0, Winter '27"), the Salesforce Limits and Allocations Quick Reference, and the Winter '27 Release Notes (August 31, 2026). Winter '27 raised the Apex heap limits; the callout size cap did not move with them. No other core limit numbers changed. Pub/Sub API allocations verified against the "Pub/Sub API and Event Allocations" documentation page.
 
 ---
 
@@ -25,7 +25,7 @@ This table lists synchronous and asynchronous limits. Async = Batch Apex, Queuea
 | @future methods invoked | 50 | 0 in batch/future; 50 in queueable |
 | Queueable jobs enqueued (System.enqueueJob) | 50 | 1 |
 | sendEmail invocations | 10 | 10 |
-| Heap size | 6 MB | 12 MB |
+| Heap size | 10 MB | 25 MB |
 | CPU time | 10,000 ms | 60,000 ms |
 | Max transaction execution time | 10 minutes | 10 minutes |
 | Push notification method calls | 10 | 10 |
@@ -33,7 +33,8 @@ This table lists synchronous and asynchronous limits. Async = Batch Apex, Queuea
 | EventBus.publish (publish immediately) | 150 | 150 |
 
 Notes:
-- Email services heap size: **50 MB** (override of the 6 MB sync heap for email services).
+- **Heap increased in Winter '27 (v68.0)**: sync 6 MB to 10 MB, async 12 MB to 25 MB. Rolled out automatically on the Winter '27 schedule; Spring '27 enforces the higher limits globally. Nonproduction orgs can temporarily keep the old limits via Setup > Apex Settings > *Enforce the Summer '26 Apex heap limit*. Confirm the org's actual value with `Limits.getLimitHeapSize()` rather than assuming.
+- Email services heap size: **50 MB** (override of the 10 MB sync heap for email services).
 - "Describes" no longer has a hard per-transaction limit — describe operations are cached and don't count.
 - Scheduled Apex uses synchronous limits despite being async-launched.
 - For Bulk API/Bulk API 2.0 transactions, the effective limit is the higher of the sync/async values.
@@ -54,7 +55,7 @@ Cursors are tracked separately from regular SOQL — they have their own row and
 | Rows across all pagination cursors per transaction | 100,000 | 100,000 |
 | Rows per page from a pagination cursor | 2,000 | 2,000 |
 
-**Elastic Limits (Beta, Summer '26):** Orgs can enable elastic limits for Queueable and @future jobs. The elastic limit is 2× the org's licensed daily async job limit (capped at +10M executions). Jobs exceeding the licensed limit are throttled instead of failing.
+**Elastic Limits (Beta, Summer '26; Batch jobs added in Winter '27):** Orgs can enable elastic limits for Queueable, @future, and — as of Winter '27 — Batch jobs. The elastic limit is 2× the org's licensed daily async job limit (capped at +10M executions). Jobs exceeding the licensed limit are throttled instead of failing; for Batch specifically, in-flight jobs are slowed and new Batch jobs are limited to 1 active job at a time. Enable it in Setup > Apex Settings > *Use elastic limits for asynchronous Apex jobs (beta)*. Beta — do not design a production process that depends on it.
 
 ## Batch Apex Limits
 
@@ -100,6 +101,7 @@ Common allocations (per org, by edition):
 | Max Process Builder + Flow subscribers per platform event | 4,000 | 4,000 | 4,000 | 5 |
 | Max **active** PB + Flow subscribers per platform event | 2,000 | 2,000 | 2,000 | 5 |
 | Max custom channels for Platform Events (excl. Real-Time Event Monitoring) | 100 | 100 | 100 | 100 |
+| Max custom channels for Change Data Capture events | 100 | 100 | 100 | 100 |
 | Max custom channels for Real-Time Event Monitoring | 3 | 3 | 3 | 3 |
 | Max distinct custom platform events per channel (channel members) | 50 | 50 | 5 | 5 |
 | Max Real-Time Event Monitoring events per channel | 10 | 10 | 10 | 10 |
@@ -126,11 +128,15 @@ Notes:
 | Max event message size | 1 MB |
 | Max recommended batch in a `PublishRequest` | 3 MB (gRPC hard cap is 4 MB) |
 | Recommended events per publish request | ≤ 200 |
-| Max events per `FetchRequest` / `ManagedFetchRequest` | 100 |
-| Max managed subscriptions per org | 200 |
+| Max events requested across all `FetchRequest` / `ManagedFetchRequest` in one Subscribe call | 100 |
+| Max unique managed subscriptions per org (ManagedSubscribe is Beta) | 200 |
 | gRPC concurrent streams per channel | 1,000 (HTTP/2 underlying connection) |
 
-Note: Pub/Sub API is the recommended subscription channel for new integrations. CometD remains supported but is in maintenance mode.
+Notes:
+- The 100-event cap is **across all fetch requests in a Subscribe call**, not per request. Asking for more is silently clamped to 100 — the server does not error.
+- A `PublishRequest` over 4 MB fails the whole call with a gRPC `UNAVAILABLE` error and the server closes the stream. An individual event over 1 MB fails only its own `PublishResult`; the rest of the batch still publishes.
+- Event delivery allocations are not Pub/Sub's own — the platform event and Change Data Capture delivery allocations above apply.
+- Pub/Sub API is the recommended subscription channel for new integrations. CometD remains supported but is in maintenance mode.
 
 ## Change Data Capture
 
@@ -147,7 +153,7 @@ Per org, by edition:
 
 Notes:
 - **No publishing limit** for CDC — Salesforce generates change events from record DML, not user-published.
-- 5-entity limit applies to selections you make and selections by unmanaged/managed packages (except AppExchange-released managed packages).
+- 5-entity limit applies to selections you make and selections by unmanaged/managed packages (except AppExchange-released managed packages). An entity selected in several channels counts once.
 - Multiple DML on the same record in the same transaction produce **one** change event with the committed final state, not one per DML.
 - Use custom channels with stream filtering to reduce delivery allocation usage.
 - If a change event exceeds 1 MB, a **gap event** is published instead.
@@ -179,6 +185,7 @@ Note: The Bulk API has no explicit "concurrent jobs" cap. Throughput is governed
 | Limit | Value |
 |---|---|
 | Composite Batch subrequests | 25 per call |
+| Composite Batch — sObject Collections or query subrequests | 5 of the 25 |
 | Composite Batch timeout | 10 minutes |
 | Composite Graph total nodes per payload | 500 |
 | Composite Graph graphs per payload | 75 |
@@ -226,6 +233,8 @@ Daily API call allocation per edition (`Total Calls Per 24-Hour Period`):
 |---|---|
 | Default callout timeout | 10 seconds (max 120s per `setTimeout`) |
 | Max callout request/response size | 6 MB (sync) / 12 MB (async) |
+| Apex trigger batch size | 200 (2,000 for platform events and CDC) |
+| For loop list batch size | 200 |
 | Max SOQL query runtime before cancel | 120 seconds |
 | Max class + trigger code units per deployment | 7,500 |
 | Max characters per class | 1,000,000 |
@@ -235,6 +244,8 @@ Daily API call allocation per edition (`Total Calls Per 24-Hour Period`):
 | Batch Apex QueryLocator max rows | 50,000,000 |
 | Daily test classes queued (production) | greater of 500 or 10 × test class count |
 | Daily test classes queued (sandbox/DE) | greater of 500 or 20 × test class count |
+
+**The callout size cap did not move with the heap increase.** Winter '27 raised heap to 10 MB / 25 MB, but the maximum callout request or response stayed at 6 MB sync / 12 MB async. Request and response sizes still count against heap.
 
 Notes:
 - Org-wide 6 MB code limit excludes managed packages (1GP/2GP) and `@isTest` classes. Increase via support case.
@@ -268,7 +279,7 @@ Flows execute inside an Apex transaction and inherit per-transaction Apex govern
 | Records retrieved by SOQL | Same as Apex (50,000) | inherited |
 | Records processed by DML | Same as Apex (10,000) | inherited |
 | CPU time per transaction | Same as Apex (10,000 ms sync / 60,000 ms async) | inherited |
-| Heap size | Same as Apex (6 MB sync / 12 MB async) | inherited |
+| Heap size | Same as Apex (10 MB sync / 25 MB async) | inherited |
 | Max flow interview size | 1,000,000 bytes (~1 MB) | multi-source |
 | Duplicate updates per batch | 12 | Trailhead "Avoid Flow Limits" |
 
@@ -303,4 +314,4 @@ These are the limits AI-generated code violates most frequently:
 2. **DML 150 statement limit** — Don't DML inside loops.
 3. **CPU 10s limit** — Watch nested loops and complex string operations.
 4. **50,000 row limit** — Always add WHERE clauses and LIMIT.
-5. **Heap 6MB limit** — Don't load large datasets into memory. Use Batch Apex for large volumes.
+5. **Heap 10MB limit** — Do not load large datasets into memory. Use Batch Apex for large volumes.

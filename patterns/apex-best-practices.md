@@ -1,7 +1,7 @@
 # Apex Best Practices — Current Patterns
 
-> AI: Use these patterns when generating Apex code. These are the current recommended approaches for Summer '26.
-> Release: Summer '26 | API: v67.0 | Updated: 2026-06
+> AI: Use these patterns when generating Apex code. These are the current recommended approaches for Winter '27.
+> Release: Winter '27 | API: v68.0 | Updated: 2026-09
 
 ---
 
@@ -293,7 +293,14 @@ Always wrap the method under test in `Test.startTest()` / `Test.stopTest()` to g
 
 ---
 
-## Security — Access Modes (Summer '26 / API v67.0)
+### Integration tests against real endpoints (Developer Preview, Winter '27)
+
+Apex integration tests can call real HTTP endpoints, including external service endpoints, without mock callouts. They relax callout restrictions and transaction rollback semantics, so they assert on real side effects. `@BeforeClass` sets up test data shared across methods in an integration test class.
+
+- Scratch orgs only, developer preview — not a replacement for `HttpCalloutMock` in a regular test suite.
+- Regular unit tests must still mock. A test that hits a live endpoint is not deterministic and does not belong in a deploy gate.
+
+## Security — Access Modes (default since Summer '26 / API v67.0)
 
 Since API v67.0, database operations run in **User Mode by default** — they enforce the current user's CRUD, FLS, and sharing. In v66.0 and earlier, they default to System Mode.
 
@@ -356,6 +363,8 @@ public inherited sharing class UtilityClass { /* inherits from caller */ }
 Since API v67.0, classes without an explicit sharing declaration default to `with sharing`. Always declare it explicitly to avoid behavior changes on API version upgrade.
 
 ---
+
+**Sharing recalculation is partly asynchronous (Release Update, enforced from Spring '26 onward).** After large-scale group or role changes, Salesforce recalculates some shares asynchronously. Apex, triggers, tests, and flows that update group membership or roles and then immediately read the resulting share records can break. Do not assume a share exists in the same transaction that caused it — re-query, or move the dependent work to an async step.
 
 ## Custom Metadata Types for Configuration
 

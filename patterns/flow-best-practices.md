@@ -1,7 +1,7 @@
 # Flow Best Practices — Current Patterns
 
 > AI: Use these patterns when designing Flow Builder automations. Flow is the only declarative automation tool — Workflow Rules and Process Builder are retired.
-> Release: Summer '26 | API: v67.0 | Updated: 2026-06
+> Release: Winter '27 | API: v68.0 | Updated: 2026-09
 
 ---
 
@@ -189,6 +189,10 @@ Order of execution (relevant portions):
 
 ---
 
+**Sharing recalculation is partly asynchronous** (Release Update, from Spring '26). A flow that changes group membership or roles and then reads the resulting share records in the same run can break. Re-query later or move the dependent step to an async path.
+
+---
+
 ## When to Use Flow vs Apex
 
 | Use Flow when | Use Apex when |
@@ -278,6 +282,7 @@ Always fill the **Description** field on the flow and on each element. Future-yo
 
 - **Debug runs** — built-in. Provide sample record IDs and see element-by-element execution.
 - **Flow Tests** (GA Winter '23) — declarative test cases stored with the flow. Cover positive paths, negative paths, and edge cases.
+- **Flow Test Mode** (Beta, Winter '27) — debug and save reusable test scenarios, and supply mock outputs for Action and Subflow elements so a flow can be tested in isolation. Beta — use it to shorten the debug loop, not as the only gate before a deploy.
 - **Salesforce DevOps Center** — version control and deployment for flows.
 
 ---
