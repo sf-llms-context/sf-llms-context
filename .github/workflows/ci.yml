@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
   schedule:
     # Weekly link check to catch external doc rot (Mondays 06:00 UTC)
     - cron: "0 6 * * 1"
