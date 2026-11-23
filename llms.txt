@@ -32,3 +32,4 @@
 ## Full Context
 
 - [Complete Reference](llms-full.txt): All content concatenated in priority order — single fetch for full context
+- [Release Delta](llms-delta.txt): Compact subset to load into every session — current API version, retirements with dates, and recent release changes (~3.5k tokens)

@@ -53,6 +53,10 @@ grep -rn "API: v" patterns/ limits/ api/ objects/ releases/
 
 Use the exact `cat` command in `CONTRIBUTING.md` (it lists the files in priority order). The CI job **llms-full.txt in sync** fails the build if `llms-full.txt` doesn't match that concatenation, so this is mandatory. If you add a new content file, add it to the `cat` list in **both** `CONTRIBUTING.md` and `.github/workflows/ci.yml`.
 
+Then regenerate `llms-delta.txt` with its `cat` command in `CONTRIBUTING.md` (CI job **llms-delta.txt in sync**). This is the compact file agents load on every session, so it carries only what models get wrong: the current version, retirements with dates, and release summaries. On each release, add the previous release's `releases/<season>-<yy>.md` to its `cat` list, and drop a release summary once the models in use have a knowledge cutoff after that release. Both lists (CONTRIBUTING.md and ci.yml) must change together.
+
+Why this split: an A/B eval on 2026-11-23 (Opus 5.5) scored the release-delta questions 52/52 with the full file and 27/52 without it, while stable core questions scored the same either way. The value is in the delta.
+
 ## 4. Re-sync GitHub Pages
 
 Pages repo: `sf-llms-context/sf-llms-context.github.io` (working copy `~/dev/sf-llms-context.github.io`).

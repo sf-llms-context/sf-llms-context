@@ -59,3 +59,21 @@ jobs:
             exit 1
           fi
           echo "llms-full.txt is in sync."
+
+  llms-delta-sync:
+    name: llms-delta.txt in sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Regenerate and diff
+        run: |
+          cat api/versions.md \
+              releases/current.md \
+              releases/summer-26.md \
+              > llms-delta.generated.txt
+          if ! diff -q llms-delta.txt llms-delta.generated.txt > /dev/null; then
+            echo "::error::llms-delta.txt is out of sync. Regenerate it (see CONTRIBUTING.md)."
+            diff llms-delta.txt llms-delta.generated.txt || true
+            exit 1
+          fi
+          echo "llms-delta.txt is in sync."
