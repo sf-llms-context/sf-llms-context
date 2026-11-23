@@ -61,12 +61,12 @@ Why this split: a small eval on 2026-11-23 (Opus 5.5, 13 questions on Winter '27
 
 Pages repo: `sf-llms-context/sf-llms-context.github.io` (working copy `~/dev/sf-llms-context.github.io`).
 
-- `llms-full.txt` — straight copy from the main repo, then push.
+- `llms-full.txt` and `llms-delta.txt` — straight copies from the main repo, then push.
 - `llms.txt` — **DO NOT overwrite** with the main repo's version. The Pages `llms.txt` is hand-customized: it uses absolute `raw.githubusercontent.com/.../main/...` links (so links resolve from the hosted site), an absolute `https://sf-llms-context.github.io/llms-full.txt` full-context link, and an extra `## Source` section. Port any new sections/links into it manually with absolute URLs.
 
 ```bash
 PAGES=~/dev/sf-llms-context.github.io
-cp llms-full.txt "$PAGES/llms-full.txt"
+cp llms-full.txt llms-delta.txt "$PAGES/"
 # edit "$PAGES/llms.txt" by hand if llms.txt changed
 git -C "$PAGES" add -A && git -C "$PAGES" commit -m "Sync <season> '<yy>" && git -C "$PAGES" push
 ```
@@ -75,21 +75,27 @@ GitHub Pages takes ~1 minute to deploy. Verify the live URLs return 200 and cont
 
 ## 5. PR and merge
 
-Branch as `content/<season>-<yy>` (see naming in `CLAUDE.md`), open a PR, let CI pass (markdownlint, link check, llms-full sync), then merge. After merge, re-sync Pages (step 4) and update the repo descriptions (step 6).
+Branch as `content/<season>-<yy>` (see naming in `CLAUDE.md`), open a PR, let CI pass (markdownlint, link check, llms-full sync, llms-delta sync), then merge. After merge, re-sync Pages (step 4) and update the repo descriptions (step 6).
 
-**If the PR shows no checks at all, the workflow is switched off.** GitHub disables
-a workflow after 60 days without repository activity, and that kills every trigger
-on it — `pull_request` included, not just the weekly schedule. This repo is touched
-about three times a year, so expect it every release. Re-enable it under
-Actions → CI → **Enable workflow**, then close and reopen the PR to trigger a run;
-enabling alone does not re-run anything. Check the state with:
+**If the PR shows no checks at all, CI did not run. Do not merge.** GitHub disables a
+workflow after 60 days without repository activity, and that kills every trigger on
+it, `pull_request` included. This repo is touched about three times a year, so expect
+it every release.
+
+1. Under Actions → CI, choose **Enable workflow**. If it already looks enabled, choose
+   **Disable workflow** and then **Enable workflow**.
+2. Enabling does not re-run anything. Push another commit, or use **Run workflow** and
+   pick the branch.
+3. Confirm that a run exists for the commit:
 
 ```bash
-curl -s https://api.github.com/repos/sf-llms-context/sf-llms-context/actions/workflows \
-  | grep -o '"state": *"[^"]*"'
+curl -s "https://api.github.com/repos/sf-llms-context/sf-llms-context/actions/runs?head_sha=$(git rev-parse HEAD)" \
+  | grep -E '"(total_count|status|conclusion)"'
 ```
 
-`active` is good, `disabled_inactivity` is the case above.
+Do not rely on the workflow state alone. On 2026-11-23 the API reported `active` and the
+web UI showed no warning, yet one PR and three pushes to `main` started no run until the
+workflow was disabled and enabled again. The cause was not found.
 
 ## 6. Update the GitHub repo descriptions
 
