@@ -2771,7 +2771,7 @@ The label and the API name differ for several core objects. Querying the label f
 # Salesforce API Versions — Current and Retired
 
 > AI: Use the current API version (v68.0) on all new metadata — Apex classes, triggers, LWC, flows, and REST/SOAP/Bulk endpoint paths. Never emit a version from the v50s or lower on new code. When updating existing metadata, do not silently downgrade its version.
-> Release: Winter '27 | API: v68.0 | Updated: 2026-09
+> Release: Winter '27 | API: v68.0 | Updated: 2026-11
 > Source: Verified against the Salesforce REST API, Apex, and Bulk API 2.0 Developer Guides (all "Version 68.0, Winter '27") and the Winter '27 Release Notes (August 31, 2026). Retirement schedule from the REST API guide's "Understand API Version Retirement" and the Winter '27 release notes.
 
 ---
@@ -2829,7 +2829,7 @@ Anchors v58.0 (Summer '23) and v68.0 (Winter '27) are confirmed in the official 
 ```
 - GOOD:
 ```xml
-<ApiVersion>67.0</ApiVersion>
+<ApiVersion>68.0</ApiVersion>
 ```
 - WHY: old versions miss current platform behavior (e.g. secure defaults), and very old versions are retired without warning.
 
@@ -2842,7 +2842,7 @@ Anchors v58.0 (Summer '23) and v68.0 (Winter '27) are confirmed in the official 
 ### LWC API version controls framework behavior
 
 - An LWC at API version **59.0 or later** uses that value for its LWC framework version. Components at **58.0 or earlier** keep Summer '23 (API 58.0) framework behavior.
-- WHY: setting a new component below 59.0 silently opts it out of current LWC engine behavior — set new components to 67.0.
+- WHY: setting a new component below 59.0 silently opts it out of current LWC engine behavior — set new components to the current version (68.0).
 # Salesforce REST API — Current Patterns
 
 > AI: Use these patterns when generating REST API integrations against Salesforce. Always use the current version path (v68.0), OAuth 2.0, and a Composite/Collections resource instead of one HTTP call per record. For limit numbers, see limits/governor-limits.md.

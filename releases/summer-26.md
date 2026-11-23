@@ -1,7 +1,7 @@
 # Salesforce Summer '26 — Developer Change Summary
 
-> AI: Read this for what changed in Summer '26 (API v67.0) that affects generated code. The headline is the "secure by default" Apex model — on v67.0+, database operations run in User Mode and classes default to `with sharing`. Generate new code at v67.0.
-> Release: Summer '26 | API: v67.0 | Updated: 2026-06
+> AI: Read this for what changed in Summer '26 (API v67.0) that affects generated code. The headline is the "secure by default" Apex model — on v67.0+, database operations run in User Mode and classes default to `with sharing`. These behavior changes still apply in later versions. This is a past release: take the current API version from api/versions.md, not from the version numbers below.
+> Release: Summer '26 | API: v67.0 | Updated: 2026-11
 > Source: Verified against the Salesforce Summer '26 Release Notes (May 25, 2026 edition) and the Summer '26 REST/Apex/Bulk Developer Guides. Each item below is quoted or paraphrased from those documents.
 
 ---

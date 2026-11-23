@@ -35,6 +35,13 @@ Thanks for considering a contribution. This project exists to keep AI coding age
        releases/current.md \
        > llms-full.txt
    ```
+5. If you touch `api/versions.md` or any file in `releases/`, also regenerate `llms-delta.txt`, the compact always-loaded subset (current version, retirements with dates, and the release summaries newer than the knowledge cutoff of the models in use):
+   ```bash
+   cat api/versions.md \
+       releases/current.md \
+       releases/summer-26.md \
+       > llms-delta.txt
+   ```
 
 ## File structure
 
