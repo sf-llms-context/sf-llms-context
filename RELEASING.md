@@ -55,7 +55,7 @@ Use the exact `cat` command in `CONTRIBUTING.md` (it lists the files in priority
 
 Then regenerate `llms-delta.txt` with its `cat` command in `CONTRIBUTING.md` (CI job **llms-delta.txt in sync**). This is the compact file agents load on every session, so it carries only what models get wrong: the current version, retirements with dates, and release summaries. On each release, add the previous release's `releases/<season>-<yy>.md` to its `cat` list, and drop a release summary once the models in use have a knowledge cutoff after that release. Both lists (CONTRIBUTING.md and ci.yml) must change together.
 
-Why this split: an A/B eval on 2026-11-23 (Opus 5.5) scored the release-delta questions 52/52 with the full file and 27/52 without it, while stable core questions scored the same either way. The value is in the delta.
+Why this split: a small eval on 2026-11-23 (Opus 5.5, 13 questions on Winter '27 and Summer '26 changes, two runs each, max 52 points) scored 27 with no context, 35 with the Salesforce Claude Code plugin 1.11.0, 52 with `llms-delta.txt` and 52 with `llms-full.txt`. Six stable core questions scored full marks with and without `llms-full.txt`. The rubrics were written from these files, so the scores measure agreement with them, not independent correctness. Two questions were excluded because at least one condition produced no usable answer.
 
 ## 4. Re-sync GitHub Pages
 
